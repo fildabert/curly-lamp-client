@@ -1,22 +1,38 @@
 import Vue from 'vue';
 import VueRouter from 'vue-router';
-import Home from '../views/Home.vue';
+import ProductManagement from '../views/ProductManagement.vue';
+import PurchaseOrder from '../views/PurchaseOrder.vue';
+import PurchaseOrderSupplier from '../views/PurchaseOrderSupplier.vue';
+import Deliveries from '../views/Deliveries.vue';
+import Details from '../views/Details.vue';
 
 Vue.use(VueRouter);
 
 const routes = [
   {
     path: '/',
-    name: 'home',
-    component: Home,
+    name: 'PurchaseOrder',
+    component: PurchaseOrder,
   },
   {
-    path: '/about',
-    name: 'about',
-    // route level code-splitting
-    // this generates a separate chunk (about.[hash].js) for this route
-    // which is lazy-loaded when the route is visited.
-    component: () => import(/* webpackChunkName: "about" */ '../views/About.vue'),
+    path: '/product-management',
+    name: 'ProductManagement',
+    component: ProductManagement,
+  },
+  {
+    path: '/supplier',
+    name: 'PurchaseOrderSupplier',
+    component: PurchaseOrderSupplier,
+  },
+  {
+    path: '/deliveries',
+    name: 'Deliveries',
+    component: Deliveries,
+  },
+  {
+    path: '/delivery-order',
+    name: 'Details',
+    component: Details,
   },
 ];
 
