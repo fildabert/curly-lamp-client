@@ -1,5 +1,6 @@
 
 <template>
+<!-- eslint-disable max-len -->
   <v-data-table :search="search" :headers="headers" :items="desserts" :loading="$store.state.loading" class="elevation-1">
     <template v-slot:item.invoice="{ item }">
       <v-chip small :color="item.status === 'COMPLETED' ? 'green' : ''">{{ item.invoice }}</v-chip>
@@ -111,7 +112,7 @@
         </template>
           <span>Delete</span>
       </v-tooltip>
-      
+
 
       <!-- <v-tooltip bottom>
         <template v-slot:activator="{ on }">

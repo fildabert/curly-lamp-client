@@ -1,5 +1,6 @@
 
 <template>
+<!-- eslint-disable max-len -->
   <v-data-table :headers="headers" :items="desserts" :loading="$store.state.loading" sort-by="calories" class="elevation-1">
     <template v-slot:top>
       <v-toolbar flat color="white">
@@ -85,7 +86,7 @@ export default {
         sortable: false,
         value: 'name',
       },
-      { text: 'Price', value: 'price' },
+      { text: 'Buying Price', value: 'price' },
       { text: 'Stock', value: 'stock' },
       { text: 'Unit', value: 'unit' },
       { text: 'Category', value: 'category' },

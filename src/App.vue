@@ -14,7 +14,9 @@
     <template v-if="$store.state.isLogin">
       <v-app-bar app clipped-left color="#FFFFFF">
         <v-app-bar-nav-icon @click="drawer = !drawer" />
+                <!-- <v-img src="https://trustyourperceptions.files.wordpress.com/2016/05/1280px-human_semen_in_a_petri_dish-e1462598125307.jpg" max-height="80" max-width="80"></v-img> -->
         <v-img src="./assets/sinoma-logo.png" max-height="300" max-width="500"></v-img>
+
         <v-spacer></v-spacer>
         <v-list rounded dense style='max-height: 63px;' class="mb-3">
           <v-list-item-group color="primary">
@@ -22,7 +24,8 @@
             <div></div>
           <v-list-item-avatar class="mr-3">
             <v-avatar :color="'#'+(Math.random()*0xFFFFFF<<0).toString(16)" style="padding-right: 7px;">
-              <span class="white--text headline">{{$store.state.user.username.split("")[0].toUpperCase()}}</span>
+              <v-img src="./assets/dapis.png" max-height="90" max-width="50"></v-img>
+              <!-- <span class="white--text headline">{{$store.state.user.username.split("")[0].toUpperCase()}}</span> -->
             </v-avatar>
           </v-list-item-avatar>
           <v-list-item-content>
@@ -137,7 +140,7 @@ export default {
 
 <style>
 #wallpaper {
-  background-image: url('https://www.pngitem.com/pimgs/m/492-4922062_weed-nug-transparent-background-hd-png-download.png');
+  /* background-image: url('./assets/weed-wallpaper.jpg'); */
   background-position: center;
   background-color: #F4F7F8;
 }

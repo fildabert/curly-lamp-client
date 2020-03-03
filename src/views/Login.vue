@@ -6,8 +6,8 @@
     lazy-validation
   >
   <v-row>
-    <v-col offset="3">
-      <v-img width="500" height="300" src="https://lh5.googleusercontent.com/proxy/I2oK4vnLiwK7VH1GniKKpxtB8nsqrR5aenTlnUpooctP8vRu1QMh4cFhvP4zQMuLKA8wj8juQumfex57Ch9KpnFPPH78LCb3r9fS_sLBzMFyZosWSF_tMHMjEWopMeyKozld"></v-img>
+    <v-col offset="4">
+        <v-img src="../assets/newlogo.png" max-height="200" max-width="400"></v-img>
     </v-col>
   </v-row>
 

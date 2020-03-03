@@ -1,4 +1,5 @@
 <template>
+<!-- eslint-disable max-len -->
   <v-container>
     <v-container style="width: 80%;">
       <v-timeline align-top :dense="$vuetify.breakpoint.smAndDown">
@@ -17,7 +18,7 @@
           ></v-skeleton-loader>
             <v-card-text v-if="!$store.state.loading" class="white text--primary">
               <p>Delivery Order: <strong>{{transaction.invoice}}</strong> [{{transaction.amount}} {{transaction.productId.unit}} {{transaction.productId.name}}] was sent to {{transaction.customerName}}
-                at {{new Date(transaction.dateDelivered).toLocaleDateString()}}
+                at {{new Date(transaction.dateDelivered).toISOString().split('T')[0]}}
               </p>
               <v-text-field
               dense
@@ -36,10 +37,6 @@
             </v-card-text>
           </v-card>
         </v-timeline-item>
-
-
-
-
 
 
         <v-timeline-item :color="transaction.status === 'COMPLETED' ? 'primary' : 'grey'">
@@ -79,10 +76,6 @@
             </v-card-text>
           </v-card>
         </v-timeline-item>
-
-
-
-
 
 
         <v-timeline-item :color="transaction.url ? 'primary' : 'grey'" v-if="transaction.status === 'COMPLETED'">
@@ -171,7 +164,7 @@ export default {
         this.$store.commit('SET_LOADING', false);
       }
     },
-    
+
     async inputDeliveryOrder() {
       try {
         this.$store.commit('SET_LOADING', true);
@@ -228,7 +221,7 @@ export default {
           url: `${this.baseUrl}/transactions/upload/${this.transaction._id}`,
           data: formData,
         });
-        await setTimeout(async() => {
+        await setTimeout(async () => {
           await this.initialize();
         }, 1000);
       } catch (error) {

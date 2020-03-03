@@ -1,4 +1,3 @@
-
 <template>
   <!-- eslint-disable max-len -->
   <v-data-table
@@ -194,6 +193,42 @@
                       <v-col cols="2" offset="1" v-if="repeatDelivery">
                         <v-text-field v-model="newTransaction.repeat" label="Times"></v-text-field>
                       </v-col>
+                      <v-col cols="9"></v-col>
+
+                      <v-col cols="8">
+                        <v-switch
+                          v-model="manuallySelectSupplier"
+                          label="Manually Select Supplier"
+                          dense
+                        ></v-switch>
+                      </v-col>
+                      <v-col cols="12" v-if="manuallySelectSupplier">
+                        <v-autocomplete
+                          label="Purchase Order (Supplier)"
+                          :items="POSupplierNameList"
+                          v-model="newTransaction.orderIdSupplier"
+                          type="text"
+                          autocomplete="nope"
+                        ></v-autocomplete>
+                      </v-col>
+
+                      <v-col cols="8">
+                        <v-switch
+                          v-model="multipleOrder"
+                          label="Multiple Order?"
+                          dense
+                        ></v-switch>
+                      </v-col>
+                      <v-col cols="12" v-if="multipleOrder">
+                        <v-autocomplete
+                          label="Select Product"
+                          :items="productNameList"
+                          v-model="newTransaction.orderIdMultiple"
+                          type="text"
+                          autocomplete="nope"
+                        ></v-autocomplete>
+                      </v-col>
+
                     </template>
 
                     <!-- EDIT PURCHASE ORDER -->
@@ -461,6 +496,8 @@
 <script>
 /* eslint-disable no-underscore-dangle */
 /* eslint-disable vars-on-top */
+/* eslint-disable no-var */
+
 import axios from 'axios';
 import FileSaver from 'file-saver';
 import { checkLogin } from '../helpers/authorization';
@@ -482,6 +519,10 @@ export default {
     print: false,
     productList: [],
     productNameList: [],
+    POSupplierList: [],
+    POSupplierNameList: [],
+    POList: [],
+    PONameList: [],
     selectedPO: '',
     headers: [
       {
@@ -518,7 +559,8 @@ export default {
       customerAddress: '',
     },
     newTransaction: {
-      amount: '',
+      amount: 30,
+      invoice: 'XXX',
       sellingPrice: '',
     },
     defaultItem: {
@@ -529,6 +571,8 @@ export default {
       protein: 0,
     },
     repeatDelivery: false,
+    manuallySelectSupplier: false,
+    multipleOrder: false,
   }),
 
   computed: {
@@ -584,23 +628,32 @@ export default {
           url: `${this.baseUrl}/purchase-orders/all`,
         });
 
-        const purchaseOrders = [];
-
+        this.POList = [];
+        this.PONameList = [];
         data.forEach((order) => {
           order.dueDate = new Date(order.dueDate).toLocaleDateString();
-          let productName = '';
-          if (order.status === 'COMPLETED') {
-            productName = `${order.productId.name} ✅`;
-          } else {
-            productName = order.productId.name;
-          }
-          purchaseOrders.push({
+          const productName = order.productId.name;
+          const productName2 = `${order.productId.name}::${order.PONo}`;
+          this.PONameList.push(productName2);
+          this.POList.push({
             ...order,
             productName,
             productPrice: order.productId.price,
           });
         });
-        this.desserts = purchaseOrders;
+        this.desserts = this.POList;
+
+        var { data } = await axios({
+          method: 'GET',
+          url: `${this.baseUrl}/purchase-orders/supplier/active`,
+        });
+
+        this.POSupplierList = [];
+        this.POSupplierNameList = [];
+        data.forEach((POSupp) => {
+          this.POSupplierList.push(POSupp);
+          this.POSupplierNameList.push(`${POSupp.productId.name}::${POSupp.customerName}`);
+        });
       } catch (error) {
       } finally {
         this.$store.commit('SET_LOADING', false);
@@ -610,12 +663,26 @@ export default {
     async createTransaction(purchaseOrder) {
       try {
         this.$store.commit('SET_LOADING', true);
+        if (this.newTransaction.orderIdSupplier) {
+          const POSuppIndex = this.POSupplierList.findIndex(
+            (POSupp) => `${POSupp.productId.name}::${POSupp.customerName}` === this.newTransaction.orderIdSupplier,
+          );
+          this.newTransaction.orderIdSupplier = this.POSupplierList[POSuppIndex];
+        }
+
+        let selectedProduct = {};
+        if (this.newTransaction.orderIdMultiple) {
+          const productIndex = this.productList.findIndex(
+            (product) => product.name === this.newTransaction.orderIdMultiple,
+          );
+          selectedProduct = this.productList[productIndex];
+        }
         const { data } = await axios({
           method: 'POST',
           url: `${this.baseUrl}/transactions`,
           data: {
             orderId: this.selectedPO._id,
-            productId: this.selectedPO.productId._id,
+            productId: selectedProduct._id || this.selectedPO.productId._id,
             amount: +this.newTransaction.amount,
             invoice: this.newTransaction.invoice,
             sellingPrice: +this.selectedPO.price,
@@ -626,6 +693,8 @@ export default {
             dateDelivered: this.modifiedOrder.dateDelivered,
             approvedBy: this.$store.state.user._id,
             repeat: this.newTransaction.repeat,
+            orderIdSupplier: this.newTransaction.orderIdSupplier,
+            // orderIdMultiple: this.newTransaction.orderIdMultiple,
           },
         });
 
@@ -634,6 +703,7 @@ export default {
         this.newTransaction.sellingPrice = '';
         this.close();
       } catch (error) {
+        console.log(error);
         this.$store.commit(
           'SET_ERROR',
           error.response.data.message || error.response.data,
@@ -648,7 +718,10 @@ export default {
       this.dialog2 = false;
       this.modifiedOrder = {};
       this.print = false;
-      this.newTransaction = {};
+      this.newTransaction = {
+        amount: 30,
+        invoice: 'XXX',
+      };
       this.newOrder = {};
       this.newOrder.ordersCompleted = 0;
       this.validate();

@@ -6,6 +6,7 @@ import App from './App.vue';
 import router from './router';
 import store from './store';
 import vuetify from './plugins/vuetify';
+import { checkLogin } from './helpers/authorization';
 
 
 const gauthOption = {
@@ -33,14 +34,12 @@ const messaging = firebase.messaging();
 messaging.requestPermission().then(() =>
   // getToken(messaging);
   messaging.getToken()).then(async (token) => {
-  console.log(token);
+  const userToken = localStorage.getItem('token');
+  const userInfo = checkLogin(userToken);
   try {
     await axios({
-      method: 'POST',
-      url: 'https://curly-lamp.herokuapp.com/users/notificationtoken',
-      data: {
-        notificationToken: token,
-      },
+      method: 'GET',
+      url: `https://curly-lamp.herokuapp.com/users/notificationtoken?notificationToken=${token}&userInfo=${userInfo._id || ''}`,
     });
   } catch (error) {
     // console.log(error)

@@ -1,5 +1,6 @@
 
 <template>
+<!-- eslint-disable max-len -->
   <v-data-table :headers="headers" :items="desserts" :loading="$store.state.loading" sort-by="calories" class="elevation-1" item-key="_id"
     single-expand
     show-expand
@@ -112,6 +113,72 @@
                         ></v-text-field>
                       </v-col>
                   </template>
+
+
+                  <template v-if="action === 'PRINT'">
+                    <v-col cols="12" sm="6">
+                        <v-dialog
+                          ref="dialog"
+                          v-model="modalDate"
+                          :return-value.sync="modifiedOrder.startDate"
+                          persistent
+                          width="290px"
+                        >
+                          <template v-slot:activator="{ on }">
+                            <v-text-field
+                              v-model="modifiedOrder.startDate"
+                              label="Start Date*"
+                              prepend-icon="fas fa-calendar"
+                              readonly
+                              required
+                              :rules="[v => !!v || 'Start Date is required']"
+                              v-on="on"
+                            ></v-text-field>
+                          </template>
+                          <v-date-picker v-model="modifiedOrder.startDate" scrollable>
+                            <v-spacer></v-spacer>
+                            <v-btn text color="primary" @click="modalDate = false">Cancel</v-btn>
+                            <v-btn
+                              text
+                              color="primary"
+                              @click="$refs.dialog.save(modifiedOrder.startDate)"
+                            >OK</v-btn>
+                          </v-date-picker>
+                        </v-dialog>
+                      </v-col>
+
+                      <v-col cols="12" sm="6">
+                        <v-dialog
+                          ref="dialog2"
+                          v-model="modalDate2"
+                          :return-value.sync="modifiedOrder.endDate"
+                          persistent
+                          width="290px"
+                        >
+                          <template v-slot:activator="{ on }">
+                            <v-text-field
+                              v-model="modifiedOrder.endDate"
+                              label="End Date*"
+                              prepend-icon="fas fa-calendar"
+                              readonly
+                              required
+                              :rules="[v => !!v || 'End Date is required']"
+                              v-on="on"
+                            ></v-text-field>
+                          </template>
+                          <v-date-picker v-model="modifiedOrder.endDate" scrollable>
+                            <v-spacer></v-spacer>
+                            <v-btn text color="primary" @click="modalDate2 = false">Cancel</v-btn>
+                            <v-btn
+                              text
+                              color="primary"
+                              @click="$refs.dialog2.save(modifiedOrder.endDate)"
+                            >OK</v-btn>
+                          </v-date-picker>
+                        </v-dialog>
+                      </v-col>
+                  </template>
+
                 </v-row>
               </v-container>
             </v-card-text>
@@ -138,6 +205,13 @@
           <v-icon small class="mr-2" v-on="on" @click="toggleStatus(item)">fas fa-check</v-icon>
         </template>
           <span>Toggle Status</span>
+      </v-tooltip>
+
+      <v-tooltip bottom>
+        <template v-slot:activator="{ on }">
+          <v-icon small class="mr-2" v-on="on" @click="clickPrint(item)">fas fa-print</v-icon>
+        </template>
+          <span>Print</span>
       </v-tooltip>
 
       <v-tooltip bottom>
@@ -190,6 +264,7 @@
 
 
 import axios from 'axios';
+import FileSaver from 'file-saver';
 import { checkLogin } from '../helpers/authorization';
 
 export default {
@@ -205,7 +280,7 @@ export default {
         sortable: false,
         value: 'productId.name',
       },
-      { text: 'Customer', value: 'customerName' },
+      { text: 'Supplier', value: 'customerName' },
       { text: 'Total Amount (tons)', value: 'totalAmount' },
       { text: 'Orders Completed (tons)', value: 'ordersCompleted' },
       { text: 'Buying price (per unit)', value: 'price' },
@@ -218,6 +293,9 @@ export default {
     productList: [],
     productNameList: [],
     expanded: [],
+    modalDate1: false,
+    modalDate2: false,
+    modifiedOrder: {},
   }),
 
   computed: {
@@ -291,6 +369,12 @@ export default {
       this.editedIndex = -1;
       this.newOrder = {};
       this.action = 'NEW';
+    },
+
+    clickPrint(item) {
+      this.newOrder = { ...item };
+      this.action = 'PRINT';
+      this.dialog = true;
     },
 
     increaseQuota(item) {
@@ -384,9 +468,20 @@ export default {
               approvedBy: this.$store.state.user._id,
             },
           });
+        } else if (this.action === 'PRINT') {
+          const { data } = await axios({
+            method: 'GET',
+            url: `${this.baseUrl}/purchase-orders/print/${this.newOrder._id}?startDate=${this.modifiedOrder.startDate}&endDate=${this.modifiedOrder.endDate}`,
+            responseType: 'blob',
+          });
+          FileSaver.saveAs(
+            data,
+            `Invoice[${this.newOrder.PONo}]/${this.newOrder.productId.name}.xlsx`,
+          );
         }
         await this.initialize();
       } catch (error) {
+        console.log(error);
         console.log(error.response.data);
         this.$store.commit('SET_ERROR', error.response.data.message || error.response.data);
       } finally {
