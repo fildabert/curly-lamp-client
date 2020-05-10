@@ -14,7 +14,7 @@
   >
     <template v-slot:top>
       <v-toolbar flat color="white">
-        <v-toolbar-title>Purchase Order</v-toolbar-title>
+        <v-toolbar-title>Purchase Order (Buyer)</v-toolbar-title>
         <v-divider class="mx-4" inset vertical></v-divider>
         <v-text-field
           v-model="search"
@@ -66,36 +66,6 @@
                           required
                         ></v-text-field>
                       </v-col>
-                      <!-- <v-col cols="12" sm="6">
-                        <v-dialog
-                          ref="dialog"
-                          v-model="modalDate"
-                          :return-value.sync="newOrder.dueDate"
-                          persistent
-                          width="290px"
-                        >
-                          <template v-slot:activator="{ on }">
-                            <v-text-field
-                              v-model="newOrder.dueDate"
-                              label="Due Date*"
-                              prepend-icon="fas fa-calendar"
-                              readonly
-                              required
-                              :rules="[v => !!v || 'Due Date is required']"
-                              v-on="on"
-                            ></v-text-field>
-                          </template>
-                          <v-date-picker v-model="newOrder.dueDate" scrollable>
-                            <v-spacer></v-spacer>
-                            <v-btn text color="primary" @click="modalDate = false">Cancel</v-btn>
-                            <v-btn
-                              text
-                              color="primary"
-                              @click="$refs.dialog.save(newOrder.dueDate)"
-                            >OK</v-btn>
-                          </v-date-picker>
-                        </v-dialog>
-                      </v-col>-->
 
                       <v-col cols="12" sm="6">
                         <v-text-field
@@ -116,12 +86,15 @@
                       </v-col>
 
                       <v-col cols="12">
-                        <v-text-field
-                          label="Customer Name*"
-                          v-model="newOrder.customerName"
-                          :rules="[v => !!v || 'Customer Name is required']"
+                        <v-autocomplete
+                          label="Customer*"
+                          :items="customerNameList"
+                          v-model="newOrder.customerInput"
+                          type="text"
+                          autocomplete="nope"
                           required
-                        ></v-text-field>
+                          :rules="[v => !!v || 'Customer is required']"
+                        ></v-autocomplete>
                       </v-col>
                     </template>
 
@@ -213,11 +186,17 @@
                       </v-col>
 
                       <v-col cols="8">
-                        <v-switch
-                          v-model="multipleOrder"
-                          label="Multiple Order?"
-                          dense
-                        ></v-switch>
+                        <v-tooltip bottom>
+                          <template v-slot:activator="{ on }">
+                            <v-switch
+                            v-on="on"
+                            v-model="multipleOrder"
+                            label="Multiple Order?"
+                            dense
+                            ></v-switch>
+                          </template>
+                            <span>Switch this on if this is a PO with multiple orders</span>
+                        </v-tooltip>
                       </v-col>
                       <v-col cols="12" v-if="multipleOrder">
                         <v-autocomplete
@@ -471,12 +450,14 @@
               <v-list-item-content>
                 <v-list-item-title @click="$router.push(`/delivery-order?id=${t._id}`)">
                   D.O:
-                  <v-chip small>{{ t.invoice }}</v-chip> delivered at
-                  <v-chip small>{{ new Date(t.dateDelivered).toISOString().split('T')[0] }}</v-chip>
+                  <v-chip small>{{ t.invoice }}</v-chip> [{{ t.productId.name }}] delivered at
+                  <v-chip small v-if="t.dateDelivered">{{ new Date(t.dateDelivered).toISOString().split('T')[0] }}</v-chip>
                   - status:
                   <v-chip small :color="t.status === 'COMPLETED' ? 'green' : 'orange lighten-1'">
                   {{ t.status }}
                   </v-chip>
+                  <!-- <v-spacer></v-spacer>
+                  <v-icon small class="mr-2" v-on="on" @click="clickTrash(item)">fas fa-trash</v-icon> -->
                 </v-list-item-title>
               </v-list-item-content>
             </v-list-item>
@@ -489,6 +470,14 @@
           ></v-pagination>
         </v-list>
       </td>
+    </template>
+
+    <template v-slot:item.ordersCompleted="{ item, header, value }">
+      <span>{{ item.ordersCompleted.toLocaleString() }}</span>
+    </template>
+
+    <template v-slot:item.price="{ item, header, value }">
+      <span>{{ item.price.toLocaleString() }}</span>
     </template>
   </v-data-table>
 </template>
@@ -519,10 +508,12 @@ export default {
     print: false,
     productList: [],
     productNameList: [],
+    customerNameList: [],
     POSupplierList: [],
     POSupplierNameList: [],
     POList: [],
     PONameList: [],
+    customerList: [],
     selectedPO: '',
     headers: [
       {
@@ -534,6 +525,7 @@ export default {
       { text: 'Customer', value: 'customerName' },
       { text: 'Total Amount (tons)', value: 'totalAmount' },
       { text: 'Orders Completed (tons)', value: 'ordersCompleted' },
+      { text: 'DOs Completed', value: 'deliveryOrdersCompleted' },
       { text: 'Selling price (per unit)', value: 'price' },
       { text: 'PO Number', value: 'PONo' },
       { text: 'Actions', value: 'action', sortable: false },
@@ -573,6 +565,7 @@ export default {
     repeatDelivery: false,
     manuallySelectSupplier: false,
     multipleOrder: false,
+    myKey: 0,
   }),
 
   computed: {
@@ -590,6 +583,16 @@ export default {
       if (!val) {
         this.newTransaction.repeat = null;
       }
+    },
+    $route: {
+      immediate: true,
+      handler(to, from) {
+        if ((from.name === 'PurchaseOrder' && to.name === 'Details') || (from.name === 'Details' && to.name === 'PurchaseOrder')) {
+          this.$emit('destroypls', false);
+        } else {
+          this.$emit('destroypls', true);
+        }
+      },
     },
   },
 
@@ -614,46 +617,92 @@ export default {
     async initialize() {
       try {
         this.$store.commit('SET_LOADING', true);
-        var { data } = await axios({
+        const promises = [];
+        const getProducts = axios({
           method: 'GET',
           url: `${this.baseUrl}/products/all`,
         });
-        this.productList = data;
-        data.forEach((prod) => {
-          this.productNameList.push(prod.name);
-        });
 
-        var { data } = await axios({
+        const getOrders = axios({
           method: 'GET',
           url: `${this.baseUrl}/purchase-orders/all`,
         });
 
-        this.POList = [];
-        this.PONameList = [];
-        data.forEach((order) => {
-          order.dueDate = new Date(order.dueDate).toLocaleDateString();
-          const productName = order.productId.name;
-          const productName2 = `${order.productId.name}::${order.PONo}`;
-          this.PONameList.push(productName2);
-          this.POList.push({
-            ...order,
-            productName,
-            productPrice: order.productId.price,
-          });
-        });
-        this.desserts = this.POList;
-
-        var { data } = await axios({
+        const getOrderSupplier = axios({
           method: 'GET',
           url: `${this.baseUrl}/purchase-orders/supplier/active`,
         });
 
-        this.POSupplierList = [];
-        this.POSupplierNameList = [];
-        data.forEach((POSupp) => {
-          this.POSupplierList.push(POSupp);
-          this.POSupplierNameList.push(`${POSupp.productId.name}::${POSupp.customerName}`);
+        const getCustomers = await axios({
+          method: 'GET',
+          url: `${this.baseUrl}/customers/all`,
         });
+
+        this.customerList = getCustomers.data;
+        this.customerNameList = [];
+        getCustomers.data.forEach((cust) => {
+          this.customerNameList.push(cust.name);
+        });
+
+        promises.push(getOrders);
+        let productIndex = -1;
+        let supplierIndex = -1;
+        if (this.productList.length === 0) {
+          promises.push(getProducts);
+          productIndex = 1;
+        }
+        if (this.POSupplierList.length === 0) {
+          promises.push(getOrderSupplier);
+          if (productIndex === -1) {
+            supplierIndex = 1;
+          } else {
+            supplierIndex = 2;
+          }
+        }
+
+
+        const result = await Promise.all(promises);
+        console.log(result[0].data);
+        this.POList = [];
+        this.PONameList = [];
+        result[0].data.forEach((order) => {
+          order.dueDate = new Date(order.dueDate).toLocaleDateString();
+          const productName = order.productId.name;
+          const productName2 = `${order.productId.name}::${order.PONo}`;
+          this.PONameList.push(productName2);
+
+          let completed = 0;
+
+          order.transactions.forEach((trx) => {
+            if (trx.actualAmount) {
+              completed += 1;
+            }
+          });
+
+          this.POList.push({
+            ...order,
+            productName,
+            productPrice: order.productId.price,
+            deliveryOrdersCompleted: `${completed}/${order.transactions.length}`,
+          });
+        });
+        this.desserts = this.POList;
+
+        if (this.productList.length === 0) {
+          this.productList = result[productIndex].data;
+          this.productNameList = [];
+          this.productList.forEach((product) => {
+            this.productNameList.push(product.name);
+          });
+        }
+
+        if (this.POSupplierList.length === 0) {
+          this.POSupplierList = result[supplierIndex].data;
+          this.POSupplierNameList = [];
+          this.POSupplierList.forEach((POSupp) => {
+            this.POSupplierNameList.push(`${POSupp.productId.name}::${POSupp.customerName}`);
+          });
+        }
       } catch (error) {
       } finally {
         this.$store.commit('SET_LOADING', false);
@@ -677,6 +726,9 @@ export default {
           );
           selectedProduct = this.productList[productIndex];
         }
+        if (this.selectedPO.productId.name === 'Multiple' && !this.multipleOrder) {
+          throw Object.assign(new Error(), { response: { data: 'Please select which product to deliver for this Multiple PO' } });
+        }
         const { data } = await axios({
           method: 'POST',
           url: `${this.baseUrl}/transactions`,
@@ -686,6 +738,7 @@ export default {
             amount: +this.newTransaction.amount,
             invoice: this.newTransaction.invoice,
             sellingPrice: +this.selectedPO.price,
+            customerId: this.selectedPO.customerId,
             customerName: this.selectedPO.customerName,
             customerPhone: this.selectedPO.customerPhone,
             customerAddress: this.selectedPO.customerAddress,
@@ -698,18 +751,17 @@ export default {
           },
         });
 
-        await this.initialize();
+        this.initialize();
         this.newTransaction.amount = '';
         this.newTransaction.sellingPrice = '';
         this.close();
       } catch (error) {
         console.log(error);
+        this.$store.commit('SET_LOADING', false);
         this.$store.commit(
           'SET_ERROR',
           error.response.data.message || error.response.data,
         );
-      } finally {
-        this.$store.commit('SET_LOADING', false);
       }
     },
 
@@ -735,17 +787,20 @@ export default {
           (product) => product.name === this.newOrder.productInput,
         );
         const selectedProduct = this.productList[productIndex];
+        const customerIndex = this.customerList.findIndex((cust) => cust.name === this.newOrder.customerInput);
+        const selectedCustomer = this.customerList[customerIndex];
         try {
           const { data } = await axios({
             method: 'POST',
             url: `${this.baseUrl}/purchase-orders`,
             data: {
               ...this.newOrder,
+              customerId: selectedCustomer,
               productId: selectedProduct._id,
               approvedBy: this.$store.state.user._id,
             },
           });
-          await this.initialize();
+          this.initialize();
           this.close();
         } catch (error) {
           console.log(error.response.data);

@@ -4,12 +4,12 @@
   <v-data-table :headers="headers" :items="desserts" :loading="$store.state.loading" sort-by="calories" class="elevation-1">
     <template v-slot:top>
       <v-toolbar flat color="white">
-        <v-toolbar-title>Products</v-toolbar-title>
+        <v-toolbar-title>Customers</v-toolbar-title>
         <v-divider class="mx-4" inset vertical></v-divider>
         <v-spacer></v-spacer>
         <v-dialog v-model="dialog" max-width="500px">
           <template v-slot:activator="{ on }">
-            <v-btn color="primary" dark class="mb-2" v-on="on" @click="clickNewItem">New Item</v-btn>
+            <v-btn color="primary" dark class="mb-2" v-on="on" @click="clickNewItem">New Customer</v-btn>
           </template>
           <v-card>
             <v-card-title>
@@ -19,20 +19,14 @@
             <v-card-text>
               <v-container>
                 <v-row>
-                  <v-col cols="12" sm="6" md="4">
-                    <v-text-field v-model="editedItem.name" label="Product Name"></v-text-field>
+                  <v-col cols="12" sm="6" md="6">
+                    <v-text-field v-model="editedItem.name" label="Name" aria-required :rules="[v => !!v || 'Name is required']"></v-text-field>
                   </v-col>
-                  <v-col cols="12" sm="6" md="4">
-                    <v-text-field v-model="editedItem.price" label="Price"></v-text-field>
+                  <v-col cols="12" sm="6" md="6">
+                    <v-text-field v-model="editedItem.phone" label="Phone"></v-text-field>
                   </v-col>
-                  <v-col cols="12" sm="6" md="4">
-                    <v-text-field v-model="editedItem.stock" label="Stock"></v-text-field>
-                  </v-col>
-                  <v-col cols="12" sm="6" md="4">
-                    <v-text-field v-model="editedItem.unit" label="Unit"></v-text-field>
-                  </v-col>
-                  <v-col cols="12" sm="6" md="4">
-                    <v-text-field v-model="editedItem.category" label="Category"></v-text-field>
+                  <v-col cols="12" sm="12" md="12">
+                    <v-textarea v-model="editedItem.address" label="Address"></v-textarea>
                   </v-col>
                 </v-row>
               </v-container>
@@ -80,17 +74,11 @@ export default {
     baseUrl: '',
     dialog: false,
     headers: [
-      {
-        text: 'Name',
-        align: 'left',
-        sortable: false,
-        value: 'name',
-      },
-      { text: 'Buying Price', value: 'price' },
-      // { text: 'Stock', value: 'stock' },
-      { text: 'Unit', value: 'unit' },
-      { text: 'Category', value: 'category' },
-      { text: 'Actions', value: 'action', sortable: false },
+      { text: 'Name', value: 'name' },
+      { text: 'Phone', value: 'phone' },
+      { text: 'Address', value: 'address' },
+      // { text: 'Category', value: 'category' },
+      { text: 'Actions', value: 'action', sortable: false, align: 'right' },
     ],
     desserts: [],
     editedIndex: -1,
@@ -106,7 +94,7 @@ export default {
 
   computed: {
     formTitle() {
-      return this.editedIndex === -1 ? 'New Item' : 'Edit Item';
+      return this.editedIndex === -1 ? 'New Customer' : 'Edit Customer';
     },
   },
 
@@ -141,7 +129,7 @@ export default {
         this.$store.commit('SET_LOADING', true);
         const { data } = await axios({
           method: 'GET',
-          url: `${this.baseUrl}/products/all`,
+          url: `${this.baseUrl}/customers/all`,
         });
         this.desserts = data;
         this.editedItem = {};
@@ -176,7 +164,7 @@ export default {
 
           const { data } = await axios({
             method: 'DELETE',
-            url: `${this.baseUrl}/products/${this.editedItem._id}`,
+            url: `${this.baseUrl}/customers/${this.editedItem._id}`,
             data: {
               user: this.$store.state.user._id,
             },
@@ -200,27 +188,21 @@ export default {
         if (this.action === 'NEW') {
           const { data } = await axios({
             method: 'POST',
-            url: `${this.baseUrl}/products/`,
+            url: `${this.baseUrl}/customers/`,
             data: {
               name: this.editedItem.name,
-              price: this.editedItem.price,
-              stock: this.editedItem.stock,
-              unit: this.editedItem.unit,
-              category: this.editedItem.category,
-              user: this.$store.state.user._id,
+              phone: this.editedItem.phone,
+              address: this.editedItem.address,
             },
           });
         } else if (this.action === 'EDIT') {
           const { data } = await axios({
             method: 'PUT',
-            url: `${this.baseUrl}/products/${this.editedItem._id}`,
+            url: `${this.baseUrl}/customers/${this.editedItem._id}`,
             data: {
               name: this.editedItem.name,
-              price: this.editedItem.price,
-              stock: this.editedItem.stock,
-              unit: this.editedItem.unit,
-              category: this.editedItem.category,
-              user: this.$store.state.user._id,
+              phone: this.editedItem.phone,
+              address: this.editedItem.address,
             },
           });
         }

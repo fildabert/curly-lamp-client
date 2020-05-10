@@ -30,29 +30,26 @@ const config = {
 };
 firebase.initializeApp(config);
 
-const messaging = firebase.messaging();
-messaging.requestPermission().then(() =>
-  // getToken(messaging);
-  messaging.getToken()).then(async (token) => {
-  const userToken = localStorage.getItem('token');
-  const userInfo = checkLogin(userToken);
-  try {
-    await axios({
-      method: 'GET',
-      url: `https://curly-lamp.herokuapp.com/users/notificationtoken?notificationToken=${token}&userInfo=${userInfo._id || ''}`,
+if (firebase.messaging.isSupported()) {
+  const messaging = firebase.messaging();
+  messaging.requestPermission().then(() =>
+    // getToken(messaging);
+    messaging.getToken()).then(async (token) => {
+    const userToken = localStorage.getItem('token');
+    const userInfo = checkLogin(userToken);
+    try {
+      await axios({
+        method: 'GET',
+        url: `https://curly-lamp.herokuapp.com/users/notificationtoken?notificationToken=${token}&userInfo=${userInfo._id || ''}`,
+      });
+    } catch (error) {
+      // console.log(error)
+    }
+  })
+    .catch((err) => {
+      console.log('Permission denied', err);
     });
-  } catch (error) {
-    // console.log(error)
-  }
-})
-  .catch((err) => {
-    console.log('Permission denied', err);
-  });
-
-
-messaging.onMessage((payload) => {
-  console.log('onMessage: ', payload);
-});
+}
 
 
 new Vue({

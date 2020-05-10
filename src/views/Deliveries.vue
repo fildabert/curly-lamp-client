@@ -209,16 +209,17 @@ export default {
           method: 'GET',
           url: `${this.baseUrl}/transactions/all`,
         });
-        data.forEach((dessert) => {
-          dessert.dateDelivered = new Date(dessert.dateDelivered).toISOString().split('T')[0];
-          // dessert.dueDate = new Date(dessert.dueDate).toLocaleDateString();
-          if (dessert.status === 'COMPLETED') {
-            dessert.invoice = `${dessert.invoice}`;
+        data.forEach((dessert, i) => {
+          if (dessert.dateDelivered) {
+            dessert.dateDelivered = new Date(dessert.dateDelivered).toISOString().split('T')[0];
+          } else {
+            console.log(dessert);
           }
         });
         this.desserts = data;
         this.editedItem = {};
       } catch (error) {
+        console.log(error);
         this.$store.commit('SET_ERROR', error.response.data.message);
       } finally {
         this.$store.commit('SET_LOADING', false);
@@ -252,9 +253,10 @@ export default {
             data: {
               trxId: this.editedItem._id,
               orderId: this.editedItem.orderId._id,
+              user: this.$store.state.user._id,
             },
           });
-          await this.initialize();
+          this.initialize();
         } catch (error) {
           console.log(error);
           this.$store.commit('SET_ERROR', error.response.data.message);
@@ -296,12 +298,11 @@ export default {
             },
           });
         }
-        await this.initialize();
+        this.initialize();
       } catch (error) {
         console.log(error.response.data);
         this.$store.commit('SET_ERROR', error.response.data.message);
       } finally {
-        this.$store.commit('SET_LOADING', false);
         this.close();
       }
     },

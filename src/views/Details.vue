@@ -2,6 +2,7 @@
 <!-- eslint-disable max-len -->
   <v-container>
     <v-container style="width: 80%;">
+     
       <v-timeline align-top :dense="$vuetify.breakpoint.smAndDown">
         <v-timeline-item
         :color="transaction.invoice ? 'primary' : 'grey'"
@@ -17,7 +18,7 @@
             class="mx-auto"
           ></v-skeleton-loader>
             <v-card-text v-if="!$store.state.loading" class="white text--primary">
-              <p>Delivery Order: <strong>{{transaction.invoice}}</strong> [{{transaction.amount}} {{transaction.productId.unit}} {{transaction.productId.name}}] was sent to {{transaction.customerName}}
+              <p v-if="transaction.dateDelivered">Delivery Order: <strong>{{transaction.invoice}}</strong> [{{transaction.amount}} {{transaction.productId.unit}} {{transaction.productId.name}}] was sent to {{transaction.customerName}}
                 at {{new Date(transaction.dateDelivered).toISOString().split('T')[0]}}
               </p>
               <v-text-field
@@ -120,6 +121,7 @@ import axios from 'axios';
 // import cloudinary from 'cloudinary';
 
 export default {
+  name: 'Details',
   created() {
     this.baseUrl = this.$store.state.baseUrl;
     this.initialize();
@@ -211,19 +213,19 @@ export default {
       }
     },
     async upload() {
+      console.log('masuk');
       const formData = new FormData();
       formData.append('file', this.file[0]);
       formData.append('fileName', this.file[0].name);
       try {
         this.$store.commit('SET_LOADING', true);
-        await axios({
+        const { data } = await axios({
           method: 'POST',
           url: `${this.baseUrl}/transactions/upload/${this.transaction._id}`,
           data: formData,
         });
-        await setTimeout(async () => {
-          await this.initialize();
-        }, 1000);
+        console.log(data);
+        await this.initialize();
       } catch (error) {
         console.log(error.response);
       } finally {

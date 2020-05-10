@@ -24,8 +24,8 @@
             <div></div>
           <v-list-item-avatar class="mr-3">
             <v-avatar :color="'#'+(Math.random()*0xFFFFFF<<0).toString(16)" style="padding-right: 7px;">
-              <v-img src="./assets/dapis.png" max-height="90" max-width="50"></v-img>
-              <!-- <span class="white--text headline">{{$store.state.user.username.split("")[0].toUpperCase()}}</span> -->
+              <!-- <v-img src="./assets/dapis.png" max-height="90" max-width="50"></v-img> -->
+              <span class="white--text headline">{{$store.state.user.username.split("")[0].toUpperCase()}}</span>
             </v-avatar>
           </v-list-item-avatar>
           <v-list-item-content>
@@ -46,7 +46,7 @@
               <v-icon>far fa-list-alt</v-icon>
             </v-list-item-action>
             <v-list-item-content>
-              <v-list-item-title class="black--text">Purchase Order</v-list-item-title>
+              <v-list-item-title class="black--text">Purchase Order (Buyer)</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -78,6 +78,15 @@
               <v-list-item-title class="black--text">Product Management</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
+
+          <v-list-item @click="$router.push('/customer-management')">
+            <v-list-item-action>
+              <v-icon>fas fa-user</v-icon>
+            </v-list-item-action>
+            <v-list-item-content>
+              <v-list-item-title class="black--text">Customer Management</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
         </v-list>
       </v-navigation-drawer>
 
@@ -90,8 +99,14 @@
         >{{ $store.state.errorMessage }}</v-snackbar>
         <v-container>
           <transition name="fade">
-            <router-view></router-view>
+            <keep-alive exclude="Details" v-if="!destroyit">
+              <router-view @destroypls="hello" v-if="!destroyit"></router-view>
+            </keep-alive>
+          
+            <router-view v-if="destroyit" @destroypls="hello"></router-view>
           </transition>
+
+
         </v-container>
       </v-content>
     </template>
@@ -128,13 +143,19 @@ export default {
     loading: false,
     snackbar: false,
     multiLine: false,
+    componentKey: 0,
+    destroyit: false,
   }),
   methods: {
     logout() {
       this.$store.commit('SET_LOGIN', { isLogin: false, user: {} });
       localStorage.removeItem('token');
     },
+    hello(payload) {
+      this.destroyit = payload;
+    },
   },
+
 };
 </script>
 

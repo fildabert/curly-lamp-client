@@ -1,7 +1,7 @@
 
 <template>
 <!-- eslint-disable max-len -->
-  <v-data-table :headers="headers" :items="desserts" :loading="$store.state.loading" sort-by="calories" class="elevation-1" item-key="_id"
+  <v-data-table :headers="headers" :search="search" :items="desserts" :loading="$store.state.loading" sort-by="calories" class="elevation-1" item-key="_id"
     single-expand
     show-expand
     :expanded.sync="expanded">
@@ -12,6 +12,13 @@
       <v-toolbar flat color="white">
         <v-toolbar-title>Purchase Order(Supplier)</v-toolbar-title>
         <v-divider class="mx-4" inset vertical></v-divider>
+        <v-text-field
+          v-model="search"
+          prepend-icon="fas fa-search"
+          label="Search"
+          single-line
+          hide-details
+        ></v-text-field>
         <v-spacer></v-spacer>
         <v-dialog v-model="dialog" max-width="500px">
           <template v-slot:activator="{ on }">
@@ -233,7 +240,7 @@
                 <v-list-item-title @click="$router.push(`/delivery-order?id=${t._id}`)">
                   D.O:
                   <v-chip small>{{ t.invoice }}</v-chip> delivered at
-                  <v-chip small>{{ new Date(t.dateDelivered).toISOString().split('T')[0] }}</v-chip>
+                  <v-chip small v-if="t.dateDelivered">{{ new Date(t.dateDelivered).toISOString().split('T')[0] }}</v-chip>
                   - status:
                   <v-chip small :color="t.status === 'COMPLETED' ? 'green' : 'orange lighten-1'">
                   {{ t.status }}
@@ -250,6 +257,14 @@
           ></v-pagination>
         </v-list>
       </td>
+    </template>
+
+    <template v-slot:item.ordersCompleted="{ item, header, value }">
+      <span>{{ item.ordersCompleted.toLocaleString() }}</span>
+    </template>
+
+    <template v-slot:item.price="{ item, header, value }">
+      <span>{{ item.price.toLocaleString() }}</span>
     </template>
   </v-data-table>
 </template>
@@ -271,6 +286,7 @@ export default {
   data: () => ({
     page: 1,
     baseUrl: '',
+    search: '',
     dialog: false,
     modalDate: false,
     headers: [
@@ -309,6 +325,16 @@ export default {
       // eslint-disable-next-line no-unused-expressions
       val || this.close();
     },
+    $route: {
+      immediate: true,
+      handler(to, from) {
+        if ((from.name === 'PurchaseOrderSupplier' && to.name === 'Details') || (from.name === 'Details' && to.name === 'PurchaseOrderSupplier')) {
+          this.$emit('destroypls', false);
+        } else {
+          this.$emit('destroypls', true);
+        }
+      },
+    },
   },
 
   created() {
@@ -344,20 +370,18 @@ export default {
           dessert.ProductId = dessert.productId._id;
         });
 
-        var { data } = await axios({
-          method: 'GET',
-          url: `${this.baseUrl}/products/all`,
-        });
+        if (this.productList.length === 0) {
+          var { data } = await axios({
+            method: 'GET',
+            url: `${this.baseUrl}/products/all`,
+          });
+          this.productList = data;
 
-        this.productList = data;
-
-        this.productList.forEach((product) => {
-          this.productNameList.push(product.name);
-        });
-
-
+          this.productList.forEach((product) => {
+            this.productNameList.push(product.name);
+          });
+        }
         this.editedItem = {};
-        console.log(data);
       } catch (error) {
         this.$store.commit('SET_ERROR', error.response.data.message);
       } finally {
@@ -436,7 +460,6 @@ export default {
         this.$store.commit('SET_LOADING', true);
 
         if (this.action === 'NEW') {
-          console.log(this.newOrder);
           const { data } = await axios({
             method: 'POST',
             url: `${this.baseUrl}/purchase-orders/supplier`,
@@ -479,13 +502,12 @@ export default {
             `Invoice[${this.newOrder.PONo}]/${this.newOrder.productId.name}.xlsx`,
           );
         }
-        await this.initialize();
+        this.initialize();
       } catch (error) {
         console.log(error);
         console.log(error.response.data);
         this.$store.commit('SET_ERROR', error.response.data.message || error.response.data);
       } finally {
-        this.$store.commit('SET_LOADING', false);
         this.close();
       }
     },

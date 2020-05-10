@@ -5,6 +5,7 @@ import PurchaseOrder from '../views/PurchaseOrder.vue';
 import PurchaseOrderSupplier from '../views/PurchaseOrderSupplier.vue';
 import Deliveries from '../views/Deliveries.vue';
 import Details from '../views/Details.vue';
+import Customer from '../views/Customer.vue';
 
 Vue.use(VueRouter);
 
@@ -33,6 +34,11 @@ const routes = [
     path: '/delivery-order',
     name: 'Details',
     component: Details,
+  },
+  {
+    path: '/customer-management',
+    name: 'Customer',
+    component: Customer,
   },
 ];
 
