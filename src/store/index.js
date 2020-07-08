@@ -1,3 +1,4 @@
+/* eslint-disable linebreak-style */
 /* eslint-disable no-param-reassign */
 import Vue from 'vue';
 import Vuex from 'vuex';
@@ -15,6 +16,8 @@ export default new Vuex.Store({
     error: false,
     errorMessage: '',
     asd: true,
+    info: false,
+    infoMessage: '',
   },
   mutations: {
     SET_LOADING: (state, payload) => {
@@ -23,6 +26,10 @@ export default new Vuex.Store({
     SET_ERROR: (state, payload) => {
       state.error = true;
       state.errorMessage = payload;
+    },
+    SET_INFO: (state, payload) => {
+      state.info = true;
+      state.infoMessage = payload;
     },
     SET_LOGIN: (state, payload) => {
       state.isLogin = payload.isLogin;

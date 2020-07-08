@@ -1,13 +1,24 @@
 <template>
 <!-- eslint-disable linebreak-style -->
 <!-- eslint-disable max-len -->
-  <v-data-table :headers="headers" :items="desserts" :loading="$store.state.loading" sort-by="calories" class="elevation-1">
+  <v-data-table :headers="headers" :search="search" :items="invoices" :loading="$store.state.loading" sort-by="calories" class="elevation-1"
+  item-key="_id"
+    single-expand
+    show-expand
+    :expanded.sync="expanded">
     <template v-slot:top>
       <v-toolbar flat color="white">
-        <v-toolbar-title>Customers</v-toolbar-title>
+        <v-toolbar-title>Invoice(Buyer)</v-toolbar-title>
         <v-divider class="mx-4" inset vertical></v-divider>
+        <v-text-field
+          v-model="search"
+          prepend-icon="fas fa-search"
+          label="Search"
+          single-line
+          hide-details
+        ></v-text-field>
         <v-spacer></v-spacer>
-        <v-dialog v-model="dialog" max-width="500px">
+        <!-- <v-dialog v-model="dialog" max-width="500px">
           <template v-slot:activator="{ on }">
             <v-btn color="primary" dark class="mb-2" v-on="on" @click="clickNewItem">New Customer</v-btn>
           </template>
@@ -29,11 +40,7 @@
                     <v-textarea v-model="editedItem.address" label="Address"></v-textarea>
                   </v-col>
                   <v-col cols="12" sm="12" md="12">
-                    <v-text-field v-model="editedItem.type" :disabled="action === 'EDIT'" label="Type(BUYER or SUPPLIER)"></v-text-field>
-                  </v-col>
-
-                  <v-col cols="12" sm="12" md="12">
-                    <v-text-field v-model="editedItem.balance" :disabled="action === 'NEW'" label="Balance"></v-text-field>
+                    <v-text-field v-model="editedItem.type" label="Type(BUYER or SUPPLIER)"></v-text-field>
                   </v-col>
                 </v-row>
               </v-container>
@@ -45,17 +52,56 @@
               <v-btn color="blue darken-1" text @click="save" :loading="$store.state.loading" :disabled="$store.state.loading">Save</v-btn>
             </v-card-actions>
           </v-card>
-        </v-dialog>
+        </v-dialog> -->
       </v-toolbar>
     </template>
-    <template v-slot:item.action="{ item }">
 
-      <v-tooltip bottom>
-        <template v-slot:activator="{ on }">
-          <v-icon small class="mr-2" v-on="on" @click="editItem(item)">fas fa-edit</v-icon>
-        </template>
-          <span>Edit</span>
-      </v-tooltip>
+    <!-- <template v-slot:item.customer.name="{ item }">
+      <v-chip small :color="item.status === 'COMPLETED' ? 'green' : ''">{{ item.PONo }}</v-chip>
+    </template> -->
+
+    <template v-slot:item.totalAmount="{ item, header, value }">
+      <span>{{ item.totalAmount.toLocaleString() }}</span>
+    </template>
+
+    <template v-slot:item.amountPaid="{ item, header, value }">
+      <v-chip small :color="item.paid ? 'green' : item.alert ? 'red' : 'yellow'">{{ item.amountPaid.toLocaleString() }}</v-chip>
+    </template>
+
+    <template v-slot:item.quantity="{ item, header, value }">
+      <span>{{ item.quantity.toLocaleString() }}</span>
+    </template>
+
+    <template v-slot:expanded-item="{ headers, item }">
+      <td :colspan="headers.length">
+        <v-list subheader dense>
+          <v-subheader>Delivery Orders </v-subheader>
+          <v-list-item-group>
+            <v-list-item v-for="t in item.transactions.slice((page-1) * 5, ((page-1) + 1) * 5)" :key="t._id" selectable>
+              <v-list-item-content>
+                <v-list-item-title @click="$router.push(`/delivery-order?id=${t._id}`)">
+                  D.O:
+                  <v-chip small>{{ t.invoice }}</v-chip> delivered at
+                  <v-chip small v-if="t.dateDelivered">{{ new Date(t.dateDelivered).toISOString().split('T')[0] }}</v-chip>
+                  - status:
+                  <v-chip small :color="t.status === 'COMPLETED' ? 'green' : 'orange lighten-1'">
+                  {{ t.status }}
+                  </v-chip>
+                </v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
+          </v-list-item-group>
+          <v-pagination
+          v-if="item.transactions.length > 5"
+          v-model="page"
+          @click="() => console.log(page)"
+          :length="Math.ceil(item.transactions.length/5)"
+          ></v-pagination>
+        </v-list>
+      </td>
+    </template>
+
+    <template v-slot:item.action="{ item }">
 
       <v-tooltip bottom>
         <template v-slot:activator="{ on }">
@@ -63,10 +109,6 @@
         </template>
           <span>Delete</span>
       </v-tooltip>
-    </template>
-
-    <template v-slot:item.balance="{ item, header, value }">
-      <span>{{ item.balance.toLocaleString() }}</span>
     </template>
   </v-data-table>
 </template>
@@ -84,18 +126,22 @@ import { checkLogin } from '../helpers/authorization';
 export default {
   data: () => ({
     baseUrl: '',
+    search: '',
     dialog: false,
     headers: [
-      { text: 'Name', value: 'name' },
-      { text: 'Phone', value: 'phone' },
-      { text: 'Address', value: 'address' },
-      { text: 'Type', value: 'type' },
-      { text: 'Balance', value: 'balance' },
+      { text: 'Buyer', value: 'customer.name' },
+      { text: 'Purchase Order', value: 'purchaseOrder.PONo' },
+      { text: 'Date Range', value: 'dateRange' },
+      { text: 'Quantity(Tons)', value: 'quantity' },
+      { text: 'Total Amount', value: 'totalAmount' },
+      { text: 'Due Date', value: 'dueDateParsed' },
+      { text: 'Amount Paid', value: 'amountPaid' },
       {
         text: 'Actions', value: 'action', sortable: false, align: 'right',
       },
     ],
-    desserts: [],
+    invoices: [],
+    expanded: [],
     editedIndex: -1,
     editedItem: {
       name: '',
@@ -105,6 +151,7 @@ export default {
       category: 0,
     },
     action: '',
+    page: 1,
   }),
 
   computed: {
@@ -118,6 +165,16 @@ export default {
       // eslint-disable-next-line no-unused-expressions
       val || this.close();
     },
+    // $route: {
+    //   immediate: true,
+    //   handler(to, from) {
+    //     if ((from.name === 'PurchaseOrderSupplier' && to.name === 'Details') || (from.name === 'Details' && to.name === 'PurchaseOrderSupplier')) {
+    //       this.$emit('destroypls', false);
+    //     } else {
+    //       this.$emit('destroypls', true);
+    //     }
+    //   },
+    // },
   },
 
   created() {
@@ -144,12 +201,26 @@ export default {
         this.$store.commit('SET_LOADING', true);
         const { data } = await axios({
           method: 'GET',
-          url: `${this.baseUrl}/customers/all/all`,
+          url: `${this.baseUrl}/invoices/all/buyer`,
         });
-        this.desserts = data;
+
+        data.forEach((invoice) => {
+          const diffTime = Math.abs(new Date(invoice.dueDate) - new Date());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          console.log(diffDays);
+          invoice.alert = false;
+          if (diffDays <= 5) {
+            invoice.alert = true;
+          }
+          invoice.dueDateParsed = new Date(invoice.dueDate).toISOString().split('T')[0];
+          invoice.dateRange = `${new Date(invoice.startDate).toISOString().split('T')[0]} -> ${new Date(invoice.endDate).toISOString().split('T')[0]}`;
+        });
+
+        this.invoices = data;
         this.editedItem = {};
         console.log(data);
       } catch (error) {
+        console.log(error);
         this.$store.commit('SET_ERROR', error.response.data.message);
       } finally {
         this.$store.commit('SET_LOADING', false);
@@ -162,15 +233,28 @@ export default {
       this.action = 'NEW';
     },
 
-    editItem(item) {
-      this.editedIndex = this.desserts.indexOf(item);
+    async refreshItem(item) {
+      this.editedIndex = this.invoices.indexOf(item);
       this.editedItem = { ...item };
-      this.action = 'EDIT';
-      this.dialog = true;
+      this.action = 'REFRESH';
+      try {
+        this.$store.commit('SET_LOADING', true);
+        const { data } = await axios({
+          method: 'PATCH',
+          url: `${this.baseUrl}/invoices/${item._id}`,
+        });
+        await this.initialize;
+        this.$store.commit('SET_INFO', `Deducted ${data.updatedCustomer.name}'s balance by: ${data.deduct}`);
+      } catch (error) {
+        this.$store.commit('SET_ERROR', error.response.data.message);
+      } finally {
+        this.$store.commit('SET_LOADING', false);
+      }
+      // this.dialog = true;
     },
 
     async deleteItem(item) {
-      this.editedIndex = this.desserts.indexOf(item);
+      this.editedIndex = this.invoices.indexOf(item);
       this.editedItem = { ...item };
       // eslint-disable-next-line no-alert
       if (confirm('Do u really wanna do this?')) {
@@ -179,7 +263,7 @@ export default {
 
           const { data } = await axios({
             method: 'DELETE',
-            url: `${this.baseUrl}/customers/${this.editedItem._id}`,
+            url: `${this.baseUrl}/invoices/${this.editedItem._id}`,
             data: {
               user: this.$store.state.user._id,
             },
@@ -219,7 +303,6 @@ export default {
               name: this.editedItem.name,
               phone: this.editedItem.phone,
               address: this.editedItem.address,
-              balance: this.editedItem.balance,
             },
           });
         }

@@ -46,7 +46,7 @@
               <v-icon>far fa-list-alt</v-icon>
             </v-list-item-action>
             <v-list-item-content>
-              <v-list-item-title class="black--text">Purchase Order (Buyer)</v-list-item-title>
+              <v-list-item-title class="black--text">Purchase Order(Buyer)</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -88,6 +88,33 @@
             </v-list-item-content>
           </v-list-item>
         </v-list>
+        
+        <v-list-item @click="$router.push('/cashflow')">
+            <v-list-item-action>
+              <v-icon color="">fas fa-book</v-icon>
+            </v-list-item-action>
+            <v-list-item-content>
+              <v-list-item-title class="black--text">Cash Flow</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+
+        <v-list-item @click="$router.push('/invoice-buyer')">
+            <v-list-item-action>
+              <v-icon color="">fas fa-book</v-icon>
+            </v-list-item-action>
+            <v-list-item-content>
+              <v-list-item-title class="black--text">Invoice(Buyer)</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+
+          <v-list-item @click="$router.push('/invoice-supplier')">
+            <v-list-item-action>
+              <v-icon color="">fas fa-book</v-icon>
+            </v-list-item-action>
+            <v-list-item-content>
+              <v-list-item-title class="black--text">Invoice(Supplier)</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
       </v-navigation-drawer>
 
       <v-content id="wallpaper">
@@ -97,6 +124,11 @@
           :multi-line="multiLine"
           color="red"
         >{{ $store.state.errorMessage }}</v-snackbar>
+        <v-snackbar
+          v-model="$store.state.info"
+          :multi-line="multiLine"
+          color="green"
+        >{{ $store.state.infoMessage }}</v-snackbar>
         <v-container>
           <transition name="fade">
             <keep-alive exclude="Details" v-if="!destroyit">

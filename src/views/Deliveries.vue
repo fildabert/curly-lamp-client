@@ -1,5 +1,7 @@
 
+
 <template>
+<!-- eslint-disable linebreak-style -->
 <!-- eslint-disable max-len -->
   <v-data-table :search="search" :headers="headers" :items="desserts" :loading="$store.state.loading" class="elevation-1">
     <template v-slot:item.invoice="{ item }">
@@ -73,7 +75,7 @@
                     <v-text-field v-model="editedItem.amount" disabled label="Amount"></v-text-field>
                   </v-col>
                   <v-col cols="12" sm="6" md="4">
-                    <v-text-field v-model="editedItem.buyingPrice" disabled label="Buying Price"></v-text-field>
+                    <v-text-field v-model="editedItem.buyingPrice" label="Buying Price"></v-text-field>
                   </v-col>
                   <v-col cols="12" sm="6" md="4">
                     <v-text-field v-model="editedItem.sellingPrice" :disabled="!$store.state.user.admin" label="Selling Price"></v-text-field>
@@ -129,6 +131,8 @@
 /* eslint-disable no-underscore-dangle */
 /* eslint-disable no-console */
 /* eslint-disable no-throw-literal */
+/* eslint-disable linebreak-style */
+
 
 import axios from 'axios';
 import { checkLogin } from '../helpers/authorization';

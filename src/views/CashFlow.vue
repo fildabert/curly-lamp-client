@@ -1,15 +1,15 @@
 <template>
 <!-- eslint-disable linebreak-style -->
 <!-- eslint-disable max-len -->
-  <v-data-table :headers="headers" :items="desserts" :loading="$store.state.loading" sort-by="calories" class="elevation-1">
+  <v-data-table :headers="headers" :items="cashFlows" :loading="$store.state.loading" sort-by="calories" class="elevation-1">
     <template v-slot:top>
       <v-toolbar flat color="white">
-        <v-toolbar-title>Customers</v-toolbar-title>
+        <v-toolbar-title>Balance: {{ balance.toLocaleString() }}</v-toolbar-title>
         <v-divider class="mx-4" inset vertical></v-divider>
         <v-spacer></v-spacer>
         <v-dialog v-model="dialog" max-width="500px">
           <template v-slot:activator="{ on }">
-            <v-btn color="primary" dark class="mb-2" v-on="on" @click="clickNewItem">New Customer</v-btn>
+            <v-btn color="primary" dark class="mb-2" v-on="on" @click="clickNewItem">New Cash Flow</v-btn>
           </template>
           <v-card>
             <v-card-title>
@@ -19,21 +19,21 @@
             <v-card-text>
               <v-container>
                 <v-row>
-                  <v-col cols="12" sm="6" md="6">
-                    <v-text-field v-model="editedItem.name" label="Name" aria-required :rules="[v => !!v || 'Name is required']"></v-text-field>
-                  </v-col>
-                  <v-col cols="12" sm="6" md="6">
-                    <v-text-field v-model="editedItem.phone" label="Phone"></v-text-field>
-                  </v-col>
-                  <v-col cols="12" sm="12" md="12">
-                    <v-textarea v-model="editedItem.address" label="Address"></v-textarea>
-                  </v-col>
-                  <v-col cols="12" sm="12" md="12">
-                    <v-text-field v-model="editedItem.type" :disabled="action === 'EDIT'" label="Type(BUYER or SUPPLIER)"></v-text-field>
-                  </v-col>
+
+                  <v-col cols="12">
+                        <v-autocomplete
+                          label="Customer*"
+                          :items="customerNameList"
+                          v-model="editedItem.customerInput"
+                          type="text"
+                          autocomplete="nope"
+                          required
+                          :rules="[v => !!v || 'Customer is required']"
+                        ></v-autocomplete>
+                      </v-col>
 
                   <v-col cols="12" sm="12" md="12">
-                    <v-text-field v-model="editedItem.balance" :disabled="action === 'NEW'" label="Balance"></v-text-field>
+                    <v-text-field v-model="editedItem.amount" label="Amount"></v-text-field>
                   </v-col>
                 </v-row>
               </v-container>
@@ -50,12 +50,12 @@
     </template>
     <template v-slot:item.action="{ item }">
 
-      <v-tooltip bottom>
+      <!-- <v-tooltip bottom>
         <template v-slot:activator="{ on }">
           <v-icon small class="mr-2" v-on="on" @click="editItem(item)">fas fa-edit</v-icon>
         </template>
           <span>Edit</span>
-      </v-tooltip>
+      </v-tooltip> -->
 
       <v-tooltip bottom>
         <template v-slot:activator="{ on }">
@@ -65,8 +65,12 @@
       </v-tooltip>
     </template>
 
-    <template v-slot:item.balance="{ item, header, value }">
-      <span>{{ item.balance.toLocaleString() }}</span>
+    <template v-slot:item.amount="{ item, header, value }">
+      <span>{{ item.amount.toLocaleString() }}</span>
+    </template>
+
+    <template v-slot:item.customer.type="{ item, header, value }">
+      <v-chip small>{{ item.customer.type === 'BUYER' ? 'IN' : 'OUT' }}</v-chip>
     </template>
   </v-data-table>
 </template>
@@ -77,6 +81,7 @@
 /* eslint-disable no-console */
 /* eslint-disable no-throw-literal */
 /* eslint-disable linebreak-style */
+/* eslint-disable no-var */
 
 import axios from 'axios';
 import { checkLogin } from '../helpers/authorization';
@@ -86,16 +91,17 @@ export default {
     baseUrl: '',
     dialog: false,
     headers: [
-      { text: 'Name', value: 'name' },
-      { text: 'Phone', value: 'phone' },
-      { text: 'Address', value: 'address' },
-      { text: 'Type', value: 'type' },
-      { text: 'Balance', value: 'balance' },
+      { text: 'Amount', value: 'amount' },
+      { text: 'Name', value: 'customer.name' },
+      { text: 'In/Out', value: 'customer.type' },
       {
         text: 'Actions', value: 'action', sortable: false, align: 'right',
       },
     ],
-    desserts: [],
+    balance: 0,
+    cashFlows: [],
+    customerNameList: [],
+    customerList: [],
     editedIndex: -1,
     editedItem: {
       name: '',
@@ -109,7 +115,7 @@ export default {
 
   computed: {
     formTitle() {
-      return this.editedIndex === -1 ? 'New Customer' : 'Edit Customer';
+      return this.editedIndex === -1 ? 'New Cash Flow' : 'Edit Customer';
     },
   },
 
@@ -118,6 +124,16 @@ export default {
       // eslint-disable-next-line no-unused-expressions
       val || this.close();
     },
+    // $route: {
+    //   immediate: true,
+    //   handler(to, from) {
+    //     if ((from.name === 'PurchaseOrderSupplier' && to.name === 'Details') || (from.name === 'Details' && to.name === 'PurchaseOrderSupplier')) {
+    //       this.$emit('destroypls', false);
+    //     } else {
+    //       this.$emit('destroypls', true);
+    //     }
+    //   },
+    // },
   },
 
   created() {
@@ -142,13 +158,33 @@ export default {
     async initialize() {
       try {
         this.$store.commit('SET_LOADING', true);
-        const { data } = await axios({
+        var { data } = await axios({
           method: 'GET',
-          url: `${this.baseUrl}/customers/all/all`,
+          url: `${this.baseUrl}/cashflows/all`,
         });
-        this.desserts = data;
+        this.cashFlows = data;
+
+        if (this.customerList.length === 0) {
+          var { data } = await axios({
+            method: 'GET',
+            url: `${this.baseUrl}/customers/all/all`,
+          });
+
+          this.customerList = data;
+
+          this.customerList.forEach((customer) => {
+            this.customerNameList.push(`${customer.name}(${customer.type})`);
+          });
+        }
+
+        var { data } = await axios({
+          method: 'GET',
+          url: `${this.baseUrl}/cashflows/balance`,
+        });
+
+        this.balance = data.amount;
+
         this.editedItem = {};
-        console.log(data);
       } catch (error) {
         this.$store.commit('SET_ERROR', error.response.data.message);
       } finally {
@@ -163,14 +199,14 @@ export default {
     },
 
     editItem(item) {
-      this.editedIndex = this.desserts.indexOf(item);
+      this.editedIndex = this.cashFlows.indexOf(item);
       this.editedItem = { ...item };
       this.action = 'EDIT';
       this.dialog = true;
     },
 
     async deleteItem(item) {
-      this.editedIndex = this.desserts.indexOf(item);
+      this.editedIndex = this.cashFlows.indexOf(item);
       this.editedItem = { ...item };
       // eslint-disable-next-line no-alert
       if (confirm('Do u really wanna do this?')) {
@@ -179,10 +215,7 @@ export default {
 
           const { data } = await axios({
             method: 'DELETE',
-            url: `${this.baseUrl}/customers/${this.editedItem._id}`,
-            data: {
-              user: this.$store.state.user._id,
-            },
+            url: `${this.baseUrl}/cashflows/${this.editedItem._id}`,
           });
           await this.initialize();
         } catch (error) {
@@ -201,14 +234,16 @@ export default {
         this.$store.commit('SET_LOADING', true);
 
         if (this.action === 'NEW') {
+          const customerIndex = this.customerList.findIndex((customer) => customer.name === this.editedItem.customerInput.replace(/\((.*?)\)/, ''));
+          const selectedCustomer = this.customerList[customerIndex];
+
           const { data } = await axios({
             method: 'POST',
-            url: `${this.baseUrl}/customers/`,
+            url: `${this.baseUrl}/cashflows/create`,
             data: {
-              name: this.editedItem.name,
-              phone: this.editedItem.phone,
-              address: this.editedItem.address,
-              type: this.editedItem.type,
+              customerId: selectedCustomer._id,
+              user: this.$store.state.user._id,
+              amount: Number(this.editedItem.amount),
             },
           });
         } else if (this.action === 'EDIT') {
@@ -219,7 +254,6 @@ export default {
               name: this.editedItem.name,
               phone: this.editedItem.phone,
               address: this.editedItem.address,
-              balance: this.editedItem.balance,
             },
           });
         }

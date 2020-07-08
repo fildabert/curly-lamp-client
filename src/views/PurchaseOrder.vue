@@ -338,32 +338,12 @@
                       </v-col>
 
                       <v-col cols="12">
-                        <v-dialog
-                          ref="dialog3"
-                          v-model="modalDate3"
-                          :return-value.sync="modifiedOrder.dueDate"
-                          persistent
-                          width="290px"
-                        >
-                          <template v-slot:activator="{ on }">
-                            <v-text-field
-                              v-model="modifiedOrder.dueDate"
-                              label="Due Date*"
-                              prepend-icon="fas fa-calendar"
-                              readonly
-                              v-on="on"
-                            ></v-text-field>
-                          </template>
-                          <v-date-picker v-model="modifiedOrder.dueDate" scrollable>
-                            <v-spacer></v-spacer>
-                            <v-btn text color="primary" @click="modalDate = false">Cancel</v-btn>
-                            <v-btn
-                              text
-                              color="primary"
-                              @click="$refs.dialog3.save(modifiedOrder.dueDate)"
-                            >OK</v-btn>
-                          </v-date-picker>
-                        </v-dialog>
+                        <v-text-field
+                          label="Due Date (in days starting from today)*"
+                          v-model="modifiedOrder.dueDate"
+                          :rules="[v => !!v || 'Due date is required']"
+                          required
+                        ></v-text-field>
                       </v-col>
                     </template>
                   </v-row>
@@ -587,10 +567,12 @@ export default {
     $route: {
       immediate: true,
       handler(to, from) {
-        if ((from.name === 'PurchaseOrder' && to.name === 'Details') || (from.name === 'Details' && to.name === 'PurchaseOrder')) {
-          this.$emit('destroypls', false);
-        } else {
-          this.$emit('destroypls', true);
+        if (to && from) {
+          if ((from.name === 'PurchaseOrder' && to.name === 'Details') || (from.name === 'Details' && to.name === 'PurchaseOrder')) {
+            this.$emit('destroypls', false);
+          } else {
+            this.$emit('destroypls', true);
+          }
         }
       },
     },
@@ -660,7 +642,6 @@ export default {
           }
         }
 
-
         const result = await Promise.all(promises);
         console.log(result[0].data);
         this.POList = [];
@@ -704,6 +685,7 @@ export default {
           });
         }
       } catch (error) {
+        console.log(error)
       } finally {
         this.$store.commit('SET_LOADING', false);
       }
@@ -914,7 +896,7 @@ export default {
         this.$store.commit('SET_LOADING', true);
         const { data } = await axios({
           method: 'GET',
-          url: `${this.baseUrl}/purchase-orders/print/${this.selectedPO._id}?startDate=${this.modifiedOrder.startDate}&endDate=${this.modifiedOrder.endDate}`,
+          url: `${this.baseUrl}/purchase-orders/print/${this.selectedPO._id}?startDate=${this.modifiedOrder.startDate}&endDate=${this.modifiedOrder.endDate}&dueDate=${this.modifiedOrder.dueDate}`,
           responseType: 'blob',
         });
         FileSaver.saveAs(

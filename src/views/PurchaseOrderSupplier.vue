@@ -1,4 +1,3 @@
-
 <template>
 <!-- eslint-disable max-len -->
   <v-data-table :headers="headers" :search="search" :items="desserts" :loading="$store.state.loading" sort-by="calories" class="elevation-1" item-key="_id"
@@ -97,6 +96,19 @@
                           required
                         ></v-text-field>
                       </v-col>
+
+                      <v-col cols="12">
+                        <v-autocomplete
+                          label="Supplier*"
+                          :items="customerNameList"
+                          v-model="newOrder.customerInput"
+                          type="text"
+                          autocomplete="nope"
+                          required
+                          :rules="[v => !!v || 'Supplier is required']"
+                        ></v-autocomplete>
+                      </v-col>
+
                       <v-col cols="12">
                         <v-text-field
                           label="Supplier Name*"
@@ -107,7 +119,6 @@
                         ></v-text-field>
                       </v-col>
                   </template>
-
 
                   <template v-if="action === 'INCREASE QUOTA'">
                     <v-col cols="12" sm="6">
@@ -120,7 +131,6 @@
                         ></v-text-field>
                       </v-col>
                   </template>
-
 
                   <template v-if="action === 'PRINT'">
                     <v-col cols="12" sm="6">
@@ -184,6 +194,16 @@
                           </v-date-picker>
                         </v-dialog>
                       </v-col>
+
+                      <v-col cols="12">
+                        <v-text-field
+                          label="Due Date (in days from today)*"
+                          v-model="modifiedOrder.dueDate"
+                          :rules="[v => !!v || 'Due date is required']"
+                          required
+                        ></v-text-field>
+                      </v-col>
+
                   </template>
 
                 </v-row>
@@ -277,7 +297,6 @@
 /* eslint-disable vars-on-top */
 /* eslint-disable no-var */
 
-
 import axios from 'axios';
 import FileSaver from 'file-saver';
 import { checkLogin } from '../helpers/authorization';
@@ -308,6 +327,8 @@ export default {
     action: '',
     productList: [],
     productNameList: [],
+    customerList: [],
+    customerNameList: [],
     expanded: [],
     modalDate1: false,
     modalDate2: false,
@@ -369,6 +390,19 @@ export default {
         this.desserts.forEach((dessert) => {
           dessert.ProductId = dessert.productId._id;
         });
+
+        if (this.customerList.length === 0) {
+          var { data } = await axios({
+            method: 'GET',
+            url: `${this.baseUrl}/customers/all/supplier`,
+          });
+
+          this.customerList = data;
+
+          this.customerList.forEach((customer) => {
+            this.customerNameList.push(customer.name);
+          });
+        }
 
         if (this.productList.length === 0) {
           var { data } = await axios({
@@ -460,6 +494,8 @@ export default {
         this.$store.commit('SET_LOADING', true);
 
         if (this.action === 'NEW') {
+          const customerIndex = this.customerList.findIndex((customer) => customer.name === this.newOrder.customerInput);
+          const selectedCustomer = this.customerList[customerIndex];
           const { data } = await axios({
             method: 'POST',
             url: `${this.baseUrl}/purchase-orders/supplier`,
@@ -467,6 +503,7 @@ export default {
               ...this.newOrder,
               totalAmount: +this.newOrder.totalAmount,
               productId: selectedProduct._id,
+              customerId: selectedCustomer._id,
               approvedBy: this.$store.state.user._id,
             },
           });
@@ -494,7 +531,7 @@ export default {
         } else if (this.action === 'PRINT') {
           const { data } = await axios({
             method: 'GET',
-            url: `${this.baseUrl}/purchase-orders/print/${this.newOrder._id}?startDate=${this.modifiedOrder.startDate}&endDate=${this.modifiedOrder.endDate}`,
+            url: `${this.baseUrl}/purchase-orders/print/${this.newOrder._id}?startDate=${this.modifiedOrder.startDate}&endDate=${this.modifiedOrder.endDate}&dueDate=${this.modifiedOrder.dueDate}`,
             responseType: 'blob',
           });
           FileSaver.saveAs(
