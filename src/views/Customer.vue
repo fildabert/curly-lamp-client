@@ -29,9 +29,12 @@
                     <v-textarea v-model="editedItem.address" label="Address"></v-textarea>
                   </v-col>
                   <v-col cols="12" sm="12" md="12">
-                    <v-text-field v-model="editedItem.type" :disabled="action === 'EDIT'" label="Type(BUYER or SUPPLIER)"></v-text-field>
+                    <v-text-field v-model="editedItem.type" :disabled="action === 'EDIT'" label="Type(BUYER/SUPPLIER/AGENT)"></v-text-field>
                   </v-col>
 
+                  <v-col cols="12" sm="12" md="12">
+                    <v-text-field v-model="editedItem.npwp" label="NPWP"></v-text-field>
+                  </v-col>
                   <v-col cols="12" sm="12" md="12">
                     <v-text-field v-model="editedItem.balance" :disabled="action === 'NEW'" label="Balance"></v-text-field>
                   </v-col>
@@ -66,7 +69,7 @@
     </template>
 
     <template v-slot:item.balance="{ item, header, value }">
-      <span>{{ item.balance.toLocaleString() }}</span>
+      <span>{{ item.type === 'BUYER' ? item.balance.toLocaleString() : '-' }}</span>
     </template>
   </v-data-table>
 </template>
@@ -89,6 +92,7 @@ export default {
       { text: 'Name', value: 'name' },
       { text: 'Phone', value: 'phone' },
       { text: 'Address', value: 'address' },
+      { text: 'NPWP', value: 'npwp' },
       { text: 'Type', value: 'type' },
       { text: 'Balance', value: 'balance' },
       {
@@ -208,6 +212,7 @@ export default {
               name: this.editedItem.name,
               phone: this.editedItem.phone,
               address: this.editedItem.address,
+              npwp: this.editedItem.npwp,
               type: this.editedItem.type,
             },
           });
@@ -219,6 +224,7 @@ export default {
               name: this.editedItem.name,
               phone: this.editedItem.phone,
               address: this.editedItem.address,
+              npwp: this.editedItem.npwp,
               balance: this.editedItem.balance,
             },
           });

@@ -1,6 +1,10 @@
 <template>
+ <!-- eslint-disable linebreak-style -->
   <!-- eslint-disable max-len -->
   <v-data-table
+    show-select
+    :single-select="false"
+    v-model="selected"
     :headers="headers"
     :items="desserts"
     sort-by="dueDate"
@@ -11,6 +15,7 @@
     single-expand
     show-expand
     :expanded.sync="expanded"
+    @item-expanded="expandPO"
   >
     <template v-slot:top>
       <v-toolbar flat color="white">
@@ -76,13 +81,44 @@
                         ></v-text-field>
                       </v-col>
 
-                      <v-col cols="12">
+                      <v-col cols="6">
                         <v-text-field
                           label="PO Number*"
                           v-model="newOrder.PONo"
                           :rules="[v => !!v || 'PO Number is required']"
                           required
                         ></v-text-field>
+                      </v-col>
+
+                      <v-col cols="6">
+                        <v-dialog
+                          ref="dialog2"
+                          v-model="modalDate2"
+                          :return-value.sync="newOrder.dateIssued"
+                          persistent
+                          width="290px"
+                        >
+                          <template v-slot:activator="{ on }">
+                            <v-text-field
+                              v-model="newOrder.dateIssued"
+                              label="Date Issued*"
+                              prepend-icon="fas fa-calendar"
+                              readonly
+                              required
+                              :rules="[v => !!v || 'Date Issued is required']"
+                              v-on="on"
+                            ></v-text-field>
+                          </template>
+                          <v-date-picker v-model="newOrder.dateIssued" scrollable>
+                            <v-spacer></v-spacer>
+                            <v-btn text color="primary" @click="modalDate2 = false">Cancel</v-btn>
+                            <v-btn
+                              text
+                              color="primary"
+                              @click="$refs.dialog2.save(newOrder.dateIssued)"
+                            >OK</v-btn>
+                          </v-date-picker>
+                        </v-dialog>
                       </v-col>
 
                       <v-col cols="12">
@@ -252,7 +288,7 @@
                         ></v-text-field>
                       </v-col>
 
-                      <v-col cols="12">
+                      <v-col cols="6">
                         <v-text-field
                           label="PO Number*"
                           v-model="modifiedOrder.PONo"
@@ -261,14 +297,81 @@
                         ></v-text-field>
                       </v-col>
 
+                      <v-col cols="6">
+                        <v-dialog
+                          ref="dialog2"
+                          v-model="modalDate2"
+                          :return-value.sync="modifiedOrder.dateIssued"
+                          persistent
+                          width="290px"
+                        >
+                          <template v-slot:activator="{ on }">
+                            <v-text-field
+                              v-model="modifiedOrder.dateIssued"
+                              label="Date Issued*"
+                              prepend-icon="fas fa-calendar"
+                              readonly
+                              required
+                              :rules="[v => !!v || 'Date Issued is required']"
+                              v-on="on"
+                            ></v-text-field>
+                          </template>
+                          <v-date-picker v-model="modifiedOrder.dateIssued" scrollable>
+                            <v-spacer></v-spacer>
+                            <v-btn text color="primary" @click="modalDate2 = false">Cancel</v-btn>
+                            <v-btn
+                              text
+                              color="primary"
+                              @click="$refs.dialog2.save(modifiedOrder.dateIssued)"
+                            >OK</v-btn>
+                          </v-date-picker>
+                        </v-dialog>
+                      </v-col>
+
                       <v-col cols="12">
                         <v-text-field
                           label="Customer Name*"
                           v-model="modifiedOrder.customerName"
+                          disabled
                           :rules="[v => !!v || 'Customer Name is required']"
                           required
                         ></v-text-field>
                       </v-col>
+
+                      <v-col cols="12">
+                        <h4>Additional Fee</h4>
+                      </v-col>
+                      <template v-for="fee in fees.length + 1">
+
+                          <v-col cols="4" :key="fee">
+                          <v-autocomplete
+                          label="Product*"
+                          :items="productNameList"
+                          v-model="feeProduct[fee - 1]"
+                          type="text"
+                          autocomplete="nope"
+                          required
+                          ></v-autocomplete>
+                        </v-col>
+                        <v-col cols="4">
+                          <v-text-field
+                          label="Additional Fee /ton*"
+                          v-model="feeAmount[fee - 1]"
+                          :rules="[v => !!v || 'Amount is required']"
+                        ></v-text-field>
+                        </v-col>
+                        <v-col cols="4">
+                          <v-autocomplete
+                          label="Agent*"
+                          :items="agentNameList"
+                          v-model="feeAgent[fee - 1]"
+                          type="text"
+                          autocomplete="nope"
+                          required
+                          ></v-autocomplete>
+                        </v-col>
+
+                      </template>
 
                     </template>
 
@@ -345,6 +448,15 @@
                           required
                         ></v-text-field>
                       </v-col>
+
+                      <v-col cols="12">
+                        <v-text-field
+                          label="Invoice No"
+                          v-model="modifiedOrder.invoiceName"
+                          :rules="[v => !!v || 'Invoice No is required']"
+                          required
+                        ></v-text-field>
+                      </v-col>
                     </template>
                   </v-row>
                 </v-container>
@@ -394,14 +506,14 @@
     <template v-slot:item.action="{ item }">
       <v-tooltip bottom>
         <template v-slot:activator="{ on }">
-          <v-icon small class="mr-2" v-on="on" @click="clickTruck(item)">fas fa-truck</v-icon>
+          <v-icon small class="mr-2" :disabled="selected.length > 0" v-on="on" @click="clickTruck(item)">fas fa-truck</v-icon>
         </template>
         <span>New Delivery</span>
       </v-tooltip>
 
       <v-tooltip bottom>
         <template v-slot:activator="{ on }">
-          <v-icon small class="mr-2" v-on="on" @click="clickEdit(item)">fas fa-edit</v-icon>
+          <v-icon small class="mr-2" :disabled="selected.length > 0" v-on="on" @click="clickEdit(item)">fas fa-edit</v-icon>
         </template>
         <span>Edit</span>
       </v-tooltip>
@@ -415,7 +527,7 @@
 
       <v-tooltip bottom>
         <template v-slot:activator="{ on }">
-          <v-icon small class="mr-2" v-on="on" @click="clickTrash(item)">fas fa-trash</v-icon>
+          <v-icon small class="mr-2" :disabled="selected.length > 0" v-on="on" @click="clickTrash(item)">fas fa-trash</v-icon>
         </template>
         <span>Delete</span>
       </v-tooltip>
@@ -466,6 +578,7 @@
 /* eslint-disable no-underscore-dangle */
 /* eslint-disable vars-on-top */
 /* eslint-disable no-var */
+/* eslint-disable linebreak-style */
 
 import axios from 'axios';
 import FileSaver from 'file-saver';
@@ -473,6 +586,7 @@ import { checkLogin } from '../helpers/authorization';
 
 export default {
   data: () => ({
+    options: {},
     page: 1,
     search: '',
     baseUrl: '',
@@ -487,6 +601,7 @@ export default {
     valid2: true,
     print: false,
     productList: [],
+    selected: [],
     productNameList: [],
     customerNameList: [],
     POSupplierList: [],
@@ -494,6 +609,8 @@ export default {
     POList: [],
     PONameList: [],
     customerList: [],
+    agentList: [],
+    agentNameList: [],
     selectedPO: '',
     headers: [
       {
@@ -505,7 +622,7 @@ export default {
       { text: 'Customer', value: 'customerName' },
       { text: 'Total Amount (tons)', value: 'totalAmount' },
       { text: 'Orders Completed (tons)', value: 'ordersCompleted' },
-      { text: 'DOs Completed', value: 'deliveryOrdersCompleted' },
+      { text: 'Date Issued', value: 'dateIssued' },
       { text: 'Selling price (per unit)', value: 'price' },
       { text: 'PO Number', value: 'PONo' },
       { text: 'Actions', value: 'action', sortable: false },
@@ -530,6 +647,9 @@ export default {
       customerPhone: '',
       customerAddress: '',
     },
+    feeProduct: [],
+    feeAmount: [],
+    feeAgent: [],
     newTransaction: {
       amount: 30,
       invoice: 'XXX',
@@ -551,6 +671,41 @@ export default {
   computed: {
     formTitle() {
       return this.editedIndex === -1 ? 'New Item' : 'Edit Item';
+    },
+    fees() {
+      const result = [];
+      this.feeAmount.forEach((amount, index) => {
+        if (amount) {
+          if (!result[index]) {
+            result[index] = {};
+          }
+          result[index].amount = amount;
+        }
+      });
+
+      this.feeProduct.forEach((product, index) => {
+        if (product) {
+          if (!result[index]) {
+            result[index] = {};
+          }
+          result[index].product = product;
+          const productIndex = this.productList.findIndex((prod) => prod.name === product);
+          result[index].productId = this.productList[productIndex]._id;
+        }
+      });
+
+      this.feeAgent.forEach((agent, index) => {
+        if (agent) {
+          if (!result[index]) {
+            result[index] = {};
+          }
+          const agentIndex = this.agentList.findIndex((val) => val.name === agent);
+
+          result[index].agent = agent;
+          result[index].agentId = this.agentList[agentIndex]._id;
+        }
+      });
+      return result.filter((res) => res.product && res.amount && res.agent);
     },
   },
 
@@ -596,6 +751,10 @@ export default {
   },
 
   methods: {
+    expandPO: (item, value) => {
+      console.log(item, value, 'ASDASDASDAS');
+    },
+
     async initialize() {
       try {
         this.$store.commit('SET_LOADING', true);
@@ -615,15 +774,32 @@ export default {
           url: `${this.baseUrl}/purchase-orders/supplier/active`,
         });
 
-        const getCustomers = await axios({
+        const customerPromises = [];
+        const getCustomers = axios({
           method: 'GET',
           url: `${this.baseUrl}/customers/all`,
         });
 
-        this.customerList = getCustomers.data;
+        const getAgents = axios({
+          method: 'GET',
+          url: `${this.baseUrl}/customers/all/agents`,
+        });
+
+        customerPromises.push(getCustomers);
+        customerPromises.push(getAgents);
+
+        const customerz = await Promise.all(customerPromises);
+
+        this.customerList = customerz[0].data;
         this.customerNameList = [];
-        getCustomers.data.forEach((cust) => {
+        this.customerList.forEach((cust) => {
           this.customerNameList.push(cust.name);
+        });
+
+        this.agentList = customerz[1].data;
+        this.agentNameList = [];
+        this.agentList.forEach((cust) => {
+          this.agentNameList.push(cust.name);
         });
 
         promises.push(getOrders);
@@ -643,7 +819,6 @@ export default {
         }
 
         const result = await Promise.all(promises);
-        console.log(result[0].data);
         this.POList = [];
         this.PONameList = [];
         result[0].data.forEach((order) => {
@@ -662,6 +837,7 @@ export default {
 
           this.POList.push({
             ...order,
+            dateIssued: order.dateIssued ? new Date(order.dateIssued).toISOString().split('T')[0] : '',
             productName,
             productPrice: order.productId.price,
             deliveryOrdersCompleted: `${completed}/${order.transactions.length}`,
@@ -685,7 +861,7 @@ export default {
           });
         }
       } catch (error) {
-        console.log(error)
+        console.log(error);
       } finally {
         this.$store.commit('SET_LOADING', false);
       }
@@ -855,6 +1031,16 @@ export default {
 
     clickEdit(PO) {
       console.log(PO);
+      this.feeProduct = [];
+      this.feeAmount = [];
+      this.feeAgent = [];
+      if (PO.additionalFee) {
+        PO.additionalFee.forEach((fee) => {
+          this.feeProduct.push(fee.productName);
+          this.feeAmount.push(fee.amount);
+          this.feeAgent.push(fee.customerName);
+        });
+      }
       this.modifiedOrder = PO;
       this.modifiedOrder.productInput = PO.productId.name;
       this.dialog = true;
@@ -877,6 +1063,8 @@ export default {
             ordersCompleted: this.modifiedOrder.ordersCompleted,
             price: this.modifiedOrder.price,
             PONo: this.modifiedOrder.PONo,
+            dateIssued: this.modifiedOrder.dateIssued,
+            fees: this.fees,
           },
         });
         await this.initialize();
@@ -894,21 +1082,37 @@ export default {
     async printOrder() {
       try {
         this.$store.commit('SET_LOADING', true);
-        const { data } = await axios({
-          method: 'GET',
-          url: `${this.baseUrl}/purchase-orders/print/${this.selectedPO._id}?startDate=${this.modifiedOrder.startDate}&endDate=${this.modifiedOrder.endDate}&dueDate=${this.modifiedOrder.dueDate}`,
-          responseType: 'blob',
-        });
-        FileSaver.saveAs(
-          data,
-          `Invoice[${this.selectedPO.PONo}]/${this.selectedPO.productId.name}.xlsx`,
-        );
+
+        if (this.selected.length > 0) {
+          await axios({
+            method: 'POST',
+            url: `${this.baseUrl}/purchase-orders/printMany`,
+            data: {
+              orderIds: this.selected.map((order) => order._id),
+              startDate: this.modifiedOrder.startDate,
+              endDate: this.modifiedOrder.endDate,
+              dueDate: this.modifiedOrder.dueDate,
+              invoiceName: this.modifiedOrder.invoiceName,
+            },
+          });
+        } else {
+          const { data } = await axios({
+            method: 'GET',
+            url: `${this.baseUrl}/purchase-orders/print/${this.selectedPO._id}?startDate=${this.modifiedOrder.startDate}&endDate=${this.modifiedOrder.endDate}&dueDate=${this.modifiedOrder.dueDate}&invoiceName=${this.modifiedOrder.invoiceName}`,
+            responseType: 'blob',
+          });
+          FileSaver.saveAs(
+            data,
+            `Invoice[${this.selectedPO.PONo}]/${this.selectedPO.productId.name}.xlsx`,
+          );
+        }
       } catch (error) {
         this.$store.commit(
           'SET_ERROR',
-          `No invoice found between ${this.modifiedOrder.startDate} to ${this.modifiedOrder.endDate}`,
+          error.response.data.message || error.response.data,
         );
       } finally {
+        this.close();
         this.$store.commit('SET_LOADING', false);
       }
     },

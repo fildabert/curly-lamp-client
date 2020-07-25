@@ -27,7 +27,7 @@
             <v-card-title>
               <span class="headline" v-if="action === 'NEW' || action === 'EDIT'">{{ formTitle }}</span>
               <span class="headline" v-if="action === 'INCREASE QUOTA'">Increase Quota</span>
-
+              <span class="headline" v-if="action === 'PRINT'">Print Invoice</span>
             </v-card-title>
 
             <v-card-text>
@@ -43,6 +43,7 @@
                           type="text"
                           autocomplete="nope"
                           required
+                          :disabled="action === 'EDIT'"
                           :rules="[v => !!v || 'Product is required']"
                         ></v-autocomplete>
                       </v-col>
@@ -60,28 +61,28 @@
                         <v-dialog
                           ref="dialog"
                           v-model="modalDate"
-                          :return-value.sync="newOrder.dueDate"
+                          :return-value.sync="newOrder.dateIssued"
                           persistent
                           width="290px"
                         >
                           <template v-slot:activator="{ on }">
                             <v-text-field
-                              v-model="newOrder.dueDate"
-                              label="Due Date*"
+                              v-model="newOrder.dateIssued"
+                              label="Date Issued*"
                               prepend-icon="fas fa-calendar"
                               readonly
                               required
-                              :rules="[v => !!v || 'Due Date is required']"
+                              :rules="[v => !!v || 'Date Issued is required']"
                               v-on="on"
                             ></v-text-field>
                           </template>
-                          <v-date-picker v-model="newOrder.dueDate" scrollable>
+                          <v-date-picker v-model="newOrder.dateIssued" scrollable>
                             <v-spacer></v-spacer>
                             <v-btn text color="primary" @click="modalDate = false">Cancel</v-btn>
                             <v-btn
                               text
                               color="primary"
-                              @click="$refs.dialog.save(newOrder.dueDate)"
+                              @click="$refs.dialog.save(newOrder.dateIssued)"
                             >OK</v-btn>
                           </v-date-picker>
                         </v-dialog>
@@ -101,6 +102,7 @@
                         <v-autocomplete
                           label="Supplier*"
                           :items="customerNameList"
+                          :disabled="action === 'EDIT'"
                           v-model="newOrder.customerInput"
                           type="text"
                           autocomplete="nope"
@@ -109,7 +111,7 @@
                         ></v-autocomplete>
                       </v-col>
 
-                      <v-col cols="12">
+                      <!-- <v-col cols="12">
                         <v-text-field
                           label="Supplier Name*"
                           v-model="newOrder.customerName"
@@ -117,7 +119,7 @@
                           :rules="[v => !!v || 'Supplier Name is required']"
                           required
                         ></v-text-field>
-                      </v-col>
+                      </v-col> -->
                   </template>
 
                   <template v-if="action === 'INCREASE QUOTA'">
@@ -204,6 +206,15 @@
                         ></v-text-field>
                       </v-col>
 
+                      <v-col cols="12">
+                        <v-text-field
+                          label="Invoice No*"
+                          v-model="modifiedOrder.invoiceName"
+                          :rules="[v => !!v || 'Invoice No is required']"
+                          required
+                        ></v-text-field>
+                      </v-col>
+
                   </template>
 
                 </v-row>
@@ -239,6 +250,13 @@
           <v-icon small class="mr-2" v-on="on" @click="clickPrint(item)">fas fa-print</v-icon>
         </template>
           <span>Print</span>
+      </v-tooltip>
+
+      <v-tooltip bottom>
+        <template v-slot:activator="{ on }">
+          <v-icon small class="mr-2" v-on="on" @click="clickEdit(item)">fas fa-edit</v-icon>
+        </template>
+          <span>Edit</span>
       </v-tooltip>
 
       <v-tooltip bottom>
@@ -318,6 +336,7 @@ export default {
       { text: 'Supplier', value: 'customerName' },
       { text: 'Total Amount (tons)', value: 'totalAmount' },
       { text: 'Orders Completed (tons)', value: 'ordersCompleted' },
+      { text: 'Date Issued', value: 'dateIssued' },
       { text: 'Buying price (per unit)', value: 'price' },
       { text: 'Actions', value: 'action', sortable: false },
     ],
@@ -389,6 +408,7 @@ export default {
 
         this.desserts.forEach((dessert) => {
           dessert.ProductId = dessert.productId._id;
+          if (dessert.dateIssued) dessert.dateIssued = new Date(dessert.dateIssued).toISOString().split('T')[0];
         });
 
         if (this.customerList.length === 0) {
@@ -432,6 +452,13 @@ export default {
     clickPrint(item) {
       this.newOrder = { ...item };
       this.action = 'PRINT';
+      this.dialog = true;
+    },
+
+    clickEdit(item) {
+      this.newOrder = { ...item };
+      this.editedIndex = 1;
+      this.action = 'EDIT';
       this.dialog = true;
     },
 
@@ -507,6 +534,17 @@ export default {
               approvedBy: this.$store.state.user._id,
             },
           });
+        } else if (this.action === 'EDIT') {
+          this.$store.commit('SET_LOADING', true);
+          const { data } = await axios({
+            method: 'PUT',
+            url: `${this.baseUrl}/purchase-orders/${this.newOrder._id}`,
+            data: {
+              totalAmount: +this.newOrder.totalAmount,
+              PONo: this.newOrder.PONo,
+              dateIssued: this.newOrder.dateIssued,
+            },
+          });
         } else if (this.action === 'INCREASE QUOTA') {
           const { data } = await axios({
             method: 'PUT',
@@ -531,7 +569,7 @@ export default {
         } else if (this.action === 'PRINT') {
           const { data } = await axios({
             method: 'GET',
-            url: `${this.baseUrl}/purchase-orders/print/${this.newOrder._id}?startDate=${this.modifiedOrder.startDate}&endDate=${this.modifiedOrder.endDate}&dueDate=${this.modifiedOrder.dueDate}`,
+            url: `${this.baseUrl}/purchase-orders/print/${this.newOrder._id}?startDate=${this.modifiedOrder.startDate}&endDate=${this.modifiedOrder.endDate}&dueDate=${this.modifiedOrder.dueDate}&invoiceName=${this.modifiedOrder.invoiceName}`,
             responseType: 'blob',
           });
           FileSaver.saveAs(
@@ -539,13 +577,15 @@ export default {
             `Invoice[${this.newOrder.PONo}]/${this.newOrder.productId.name}.xlsx`,
           );
         }
-        this.initialize();
+        await this.initialize();
+        this.close();
       } catch (error) {
         console.log(error);
         console.log(error.response.data);
         this.$store.commit('SET_ERROR', error.response.data.message || error.response.data);
-      } finally {
         this.close();
+      } finally {
+        this.$store.commit('SET_LOADING', false);
       }
     },
   },

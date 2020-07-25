@@ -1,4 +1,3 @@
-
 <template>
 <!-- eslint-disable max-len -->
   <v-data-table :headers="headers" :items="desserts" :loading="$store.state.loading" sort-by="calories" class="elevation-1">
@@ -101,6 +100,7 @@ export default {
       unit: 0,
       category: 0,
     },
+    temp: [],
     action: '',
   }),
 

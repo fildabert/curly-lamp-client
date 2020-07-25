@@ -1,4 +1,3 @@
-
 <template>
   <!-- eslint-disable max-len -->
   <v-app>
@@ -87,11 +86,10 @@
               <v-list-item-title class="black--text">Customer Management</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
-        </v-list>
-        
+
         <v-list-item @click="$router.push('/cashflow')">
             <v-list-item-action>
-              <v-icon color="">fas fa-book</v-icon>
+              <v-icon>fa-money-check-alt</v-icon>
             </v-list-item-action>
             <v-list-item-content>
               <v-list-item-title class="black--text">Cash Flow</v-list-item-title>
@@ -100,21 +98,23 @@
 
         <v-list-item @click="$router.push('/invoice-buyer')">
             <v-list-item-action>
-              <v-icon color="">fas fa-book</v-icon>
+              <v-icon color="">fa-clipboard-list</v-icon>
             </v-list-item-action>
             <v-list-item-content>
-              <v-list-item-title class="black--text">Invoice(Buyer)</v-list-item-title>
+              <v-list-item-title class="black--text">Invoice(Receivable)</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
           <v-list-item @click="$router.push('/invoice-supplier')">
             <v-list-item-action>
-              <v-icon color="">fas fa-book</v-icon>
+              <v-icon color="">fa-clipboard-list</v-icon>
             </v-list-item-action>
             <v-list-item-content>
-              <v-list-item-title class="black--text">Invoice(Supplier)</v-list-item-title>
+              <v-list-item-title class="black--text">Invoice(Payable)</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
+
+           </v-list>
       </v-navigation-drawer>
 
       <v-content id="wallpaper">
@@ -134,10 +134,9 @@
             <keep-alive exclude="Details" v-if="!destroyit">
               <router-view @destroypls="hello" v-if="!destroyit"></router-view>
             </keep-alive>
-          
+
             <router-view v-if="destroyit" @destroypls="hello"></router-view>
           </transition>
-
 
         </v-container>
       </v-content>

@@ -28,13 +28,44 @@
                           type="text"
                           autocomplete="nope"
                           required
+                          :disabled="action !== 'NEW'"
                           :rules="[v => !!v || 'Customer is required']"
                         ></v-autocomplete>
                       </v-col>
 
                   <v-col cols="12" sm="12" md="12">
-                    <v-text-field v-model="editedItem.amount" label="Amount"></v-text-field>
+                    <v-text-field v-model="editedItem.amount" :disabled="action !== 'NEW'" label="Amount"></v-text-field>
                   </v-col>
+                  <v-col cols="12">
+                        <v-dialog
+                          ref="dialog2"
+                          v-model="modalDate"
+                          :return-value.sync="editedItem.dateIssued"
+                          persistent
+                          width="290px"
+                        >
+                          <template v-slot:activator="{ on }">
+                            <v-text-field
+                              v-model="editedItem.dateIssued"
+                              label="Date Issued*"
+                              prepend-icon="fas fa-calendar"
+                              readonly
+                              required
+                              :rules="[v => !!v || 'Date Issued is required']"
+                              v-on="on"
+                            ></v-text-field>
+                          </template>
+                          <v-date-picker v-model="editedItem.dateIssued" scrollable>
+                            <v-spacer></v-spacer>
+                            <v-btn text color="primary" @click="modalDate = false">Cancel</v-btn>
+                            <v-btn
+                              text
+                              color="primary"
+                              @click="$refs.dialog2.save(editedItem.dateIssued)"
+                            >OK</v-btn>
+                          </v-date-picker>
+                        </v-dialog>
+                      </v-col>
                 </v-row>
               </v-container>
             </v-card-text>
@@ -50,12 +81,12 @@
     </template>
     <template v-slot:item.action="{ item }">
 
-      <!-- <v-tooltip bottom>
+      <v-tooltip bottom>
         <template v-slot:activator="{ on }">
           <v-icon small class="mr-2" v-on="on" @click="editItem(item)">fas fa-edit</v-icon>
         </template>
           <span>Edit</span>
-      </v-tooltip> -->
+      </v-tooltip>
 
       <v-tooltip bottom>
         <template v-slot:activator="{ on }">
@@ -71,6 +102,10 @@
 
     <template v-slot:item.customer.type="{ item, header, value }">
       <v-chip small>{{ item.customer.type === 'BUYER' ? 'IN' : 'OUT' }}</v-chip>
+    </template>
+
+    <template v-slot:item.invoices="{ item, header, value }">
+      <v-chip small v-for="invoice in item.invoices" :key="invoice._id">{{ invoice.name }}</v-chip>
     </template>
   </v-data-table>
 </template>
@@ -94,6 +129,8 @@ export default {
       { text: 'Amount', value: 'amount' },
       { text: 'Name', value: 'customer.name' },
       { text: 'In/Out', value: 'customer.type' },
+      { text: 'Date Issued', value: 'dateIssued' },
+      { text: 'Invoices', value: 'invoices' },
       {
         text: 'Actions', value: 'action', sortable: false, align: 'right',
       },
@@ -111,11 +148,12 @@ export default {
       category: 0,
     },
     action: '',
+    modalDate: false,
   }),
 
   computed: {
     formTitle() {
-      return this.editedIndex === -1 ? 'New Cash Flow' : 'Edit Customer';
+      return this.editedIndex === -1 ? 'New Cash Flow' : 'Edit Date';
     },
   },
 
@@ -161,6 +199,13 @@ export default {
         var { data } = await axios({
           method: 'GET',
           url: `${this.baseUrl}/cashflows/all`,
+        });
+
+        data.forEach((cash) => {
+          if (cash.dateIssued) {
+            cash.dateIssued = new Date(cash.dateIssued).toISOString().split('T')[0];
+          }
+          cash.customerInput = `${cash.customer.name}(${cash.customer.type})`;
         });
         this.cashFlows = data;
 
@@ -244,16 +289,15 @@ export default {
               customerId: selectedCustomer._id,
               user: this.$store.state.user._id,
               amount: Number(this.editedItem.amount),
+              dateIssued: this.editedItem.dateIssued,
             },
           });
         } else if (this.action === 'EDIT') {
           const { data } = await axios({
             method: 'PUT',
-            url: `${this.baseUrl}/customers/${this.editedItem._id}`,
+            url: `${this.baseUrl}/cashflows/${this.editedItem._id}`,
             data: {
-              name: this.editedItem.name,
-              phone: this.editedItem.phone,
-              address: this.editedItem.address,
+              dateIssued: this.editedItem.dateIssued,
             },
           });
         }

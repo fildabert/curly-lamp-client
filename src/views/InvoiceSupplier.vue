@@ -18,7 +18,32 @@
           hide-details
         ></v-text-field>
         <v-spacer></v-spacer>
-   
+
+        <v-dialog v-model="dialog" max-width="500px">
+          <v-card>
+            <v-card-title>
+              <span class="headline"> Edit Invoice </span>
+            </v-card-title>
+
+            <v-card-text>
+              <v-container>
+                <v-row>
+                  <v-col cols="12" sm="12" md="12">
+                    <v-text-field v-model="editedItem.name" label="Invoice No" aria-required :rules="[v => !!v || 'Invoice No is required']"></v-text-field>
+                  </v-col>
+                </v-row>
+              </v-container>
+            </v-card-text>
+
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn color="blue darken-1" text @click="close">Cancel</v-btn>
+              <v-btn color="blue darken-1" text @click="save" :loading="$store.state.loading" :disabled="$store.state.loading">Save</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+
+
       </v-toolbar>
     </template>
 
@@ -34,6 +59,10 @@
       <v-chip small :color="item.paid ? 'green' : item.alert ? 'red' : 'yellow'">{{ item.amountPaid.toLocaleString() }}</v-chip>
     </template>
 
+    <template v-slot:item.name="{ item, header, value }">
+      <v-chip small>{{ item.name }}</v-chip>
+    </template>
+
     <template v-slot:item.quantity="{ item, header, value }">
       <span>{{ item.quantity.toLocaleString() }}</span>
     </template>
@@ -41,6 +70,7 @@
     <template v-slot:expanded-item="{ headers, item }">
       <td :colspan="headers.length">
         <v-list subheader dense>
+          <v-subheader>PO: <v-chip small v-for="PO in item.purchaseOrder" :key="PO._id">{{ PO.PONo }}</v-chip></v-subheader>
           <v-subheader>Delivery Orders </v-subheader>
           <v-list-item-group>
             <v-list-item v-for="t in item.transactions.slice((page-1) * 5, ((page-1) + 1) * 5)" :key="t._id" selectable>
@@ -71,6 +101,13 @@
 
       <v-tooltip bottom>
         <template v-slot:activator="{ on }">
+          <v-icon small class="mr-2" v-on="on" @click="editItem(item)">fas fa-edit</v-icon>
+        </template>
+          <span>Edit</span>
+      </v-tooltip>
+
+      <v-tooltip bottom>
+        <template v-slot:activator="{ on }">
           <v-icon small class="mr-2" v-on="on" @click="deleteItem(item)">fas fa-trash</v-icon>
         </template>
           <span>Delete</span>
@@ -96,7 +133,7 @@ export default {
     dialog: false,
     headers: [
       { text: 'Supplier', value: 'customer.name' },
-      { text: 'Purchase Order', value: 'purchaseOrder.PONo' },
+      { text: 'Invoice No', value: 'name' },
       { text: 'Date Range', value: 'dateRange' },
       { text: 'Quantity(Tons)', value: 'quantity' },
       { text: 'Total Amount', value: 'totalAmount' },
@@ -171,9 +208,8 @@ export default {
         });
 
         data.forEach((invoice) => {
-          const diffTime = Math.abs(new Date(invoice.dueDate) - new Date());
+          const diffTime = new Date(invoice.dueDate) - new Date();
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          console.log(diffDays);
           invoice.alert = false;
           if (diffDays <= 5) {
             invoice.alert = true;
@@ -197,6 +233,13 @@ export default {
       this.editedIndex = -1;
       this.editedItem = {};
       this.action = 'NEW';
+    },
+
+    editItem(item) {
+      this.editedIndex = this.invoices.indexOf(item);
+      this.editedItem = { ...item };
+      this.action = 'EDIT';
+      this.dialog = true;
     },
 
     async refreshItem(item) {
@@ -261,14 +304,13 @@ export default {
               type: this.editedItem.type,
             },
           });
-        } else if (this.action === 'EDIT') {
+        }  else if (this.action === 'EDIT') {
           const { data } = await axios({
-            method: 'PUT',
-            url: `${this.baseUrl}/customers/${this.editedItem._id}`,
+            method: 'PATCH',
+            url: `${this.baseUrl}/invoices/editInvoice`,
             data: {
+              _id: this.editedItem._id,
               name: this.editedItem.name,
-              phone: this.editedItem.phone,
-              address: this.editedItem.address,
             },
           });
         }

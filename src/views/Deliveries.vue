@@ -1,9 +1,8 @@
-
-
 <template>
 <!-- eslint-disable linebreak-style -->
 <!-- eslint-disable max-len -->
-  <v-data-table :search="search" :headers="headers" :items="desserts" :loading="$store.state.loading" class="elevation-1">
+  <v-data-table :search="search" :headers="headers" :items="desserts" :loading="$store.state.loading"
+     class="elevation-1">
     <template v-slot:item.invoice="{ item }">
       <v-chip small :color="item.status === 'COMPLETED' ? 'green' : ''">{{ item.invoice }}</v-chip>
     </template>
@@ -64,7 +63,6 @@
                     </v-dialog>
                   </v-col>
 
-
                   <v-col cols="12" sm="6" md="4">
                     <v-text-field v-model="editedItem.carNo" label="Car No"></v-text-field>
                   </v-col>
@@ -115,7 +113,6 @@
           <span>Delete</span>
       </v-tooltip>
 
-
       <!-- <v-tooltip bottom>
         <template v-slot:activator="{ on }">
           <v-icon small class="mr-2" v-on="on" @click="deleteItem(item)">fas fa-trash</v-icon>
@@ -132,7 +129,6 @@
 /* eslint-disable no-console */
 /* eslint-disable no-throw-literal */
 /* eslint-disable linebreak-style */
-
 
 import axios from 'axios';
 import { checkLogin } from '../helpers/authorization';
