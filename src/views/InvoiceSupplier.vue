@@ -5,6 +5,7 @@
   item-key="_id"
     single-expand
     show-expand
+    @item-expanded="expandInvoice"
     :expanded.sync="expanded">
     <template v-slot:top>
       <v-toolbar flat color="white">
@@ -19,7 +20,7 @@
         ></v-text-field>
         <v-spacer></v-spacer>
 
-        <v-dialog v-model="dialog" max-width="500px">
+        <v-dialog v-model="dialog" max-width="700px">
           <v-card>
             <v-card-title>
               <span class="headline"> Edit Invoice </span>
@@ -28,9 +29,55 @@
             <v-card-text>
               <v-container>
                 <v-row>
-                  <v-col cols="12" sm="12" md="12">
+                  <v-col cols="8" sm="8" md="8">
                     <v-text-field v-model="editedItem.name" label="Invoice No" aria-required :rules="[v => !!v || 'Invoice No is required']"></v-text-field>
                   </v-col>
+
+                  <v-col cols="4" sm="4">
+                        <v-dialog
+                          ref="dialog"
+                          v-model="modalDate"
+                          :return-value.sync="editedItem.dueDate"
+                          persistent
+                          width="290px"
+                        >
+                          <template v-slot:activator="{ on }">
+                            <v-text-field
+                              v-model="editedItem.dueDate"
+                              label="Due Date*"
+                              prepend-icon="fas fa-calendar"
+                              readonly
+                              required
+                              :rules="[v => !!v || 'Due Date is required']"
+                              v-on="on"
+                            ></v-text-field>
+                          </template>
+                          <v-date-picker v-model="editedItem.dueDate" scrollable>
+                            <v-spacer></v-spacer>
+                            <v-btn text color="primary" @click="modalDate = false">Cancel</v-btn>
+                            <v-btn
+                              text
+                              color="primary"
+                              @click="$refs.dialog.save(editedItem.dueDate)"
+                            >OK</v-btn>
+                          </v-date-picker>
+                        </v-dialog>
+                      </v-col>
+
+                  <template v-for="(invoiceInfo, index) in editedItem.invoiceInfos">
+                    <v-col cols="3" sm="3" md="3" :key="invoiceInfo._id">
+                      <v-text-field v-model="editedItem.invoiceInfos[index].product.name" label="Product" aria-required disabled></v-text-field>
+                    </v-col>
+                    <v-col cols="3" sm="3" md="3">
+                      <v-text-field v-model="editedItem.invoiceInfos[index].totalQuantity" label="Quantity" aria-required></v-text-field>
+                    </v-col>
+                    <v-col cols="3" sm="3" md="3">
+                     <v-text-field v-model="editedItem.invoiceInfos[index].price" label="Price" aria-required></v-text-field>
+                    </v-col>
+                    <v-col cols="3" sm="3" md="3">
+                     <v-text-field :value="editedItem.invoiceInfos[index].totalQuantity * editedItem.invoiceInfos[index].price" label="Total Amount" aria-required disabled></v-text-field>
+                    </v-col>
+                  </template>
                 </v-row>
               </v-container>
             </v-card-text>
@@ -42,7 +89,6 @@
             </v-card-actions>
           </v-card>
         </v-dialog>
-
 
       </v-toolbar>
     </template>
@@ -73,11 +119,11 @@
           <v-subheader>PO: <v-chip small v-for="PO in item.purchaseOrder" :key="PO._id">{{ PO.PONo }}</v-chip></v-subheader>
           <v-subheader>Delivery Orders </v-subheader>
           <v-list-item-group>
-            <v-list-item v-for="t in item.transactions.slice((page-1) * 5, ((page-1) + 1) * 5)" :key="t._id" selectable>
+            <v-list-item v-for="t in item.transactions.slice((page-1) * 30, ((page-1) + 1) * 30)" :key="t._id" selectable>
               <v-list-item-content>
                 <v-list-item-title @click="$router.push(`/delivery-order?id=${t._id}`)">
                   D.O:
-                  <v-chip small>{{ t.invoice }}</v-chip> delivered at
+                  <v-chip small>{{ t.invoice }}</v-chip> <v-chip small> {{ t.actualAmount || t.amount }} </v-chip> Tons delivered at
                   <v-chip small v-if="t.dateDelivered">{{ new Date(t.dateDelivered).toISOString().split('T')[0] }}</v-chip>
                   - status:
                   <v-chip small :color="t.status === 'COMPLETED' ? 'green' : 'orange lighten-1'">
@@ -88,10 +134,10 @@
             </v-list-item>
           </v-list-item-group>
           <v-pagination
-          v-if="item.transactions.length > 5"
+          v-if="item.transactions.length > 30"
           v-model="page"
           @click="() => console.log(page)"
-          :length="Math.ceil(item.transactions.length/5)"
+          :length="Math.ceil(item.transactions.length/30)"
           ></v-pagination>
         </v-list>
       </td>
@@ -137,7 +183,7 @@ export default {
       { text: 'Date Range', value: 'dateRange' },
       { text: 'Quantity(Tons)', value: 'quantity' },
       { text: 'Total Amount', value: 'totalAmount' },
-      { text: 'Due Date', value: 'dueDateParsed' },
+      { text: 'Due Date', value: 'dueDate' },
       { text: 'Amount Paid', value: 'amountPaid' },
       {
         text: 'Actions', value: 'action', sortable: false, align: 'right',
@@ -154,6 +200,7 @@ export default {
       category: 0,
     },
     action: '',
+    modalDate: false,
     page: 1,
   }),
 
@@ -186,6 +233,31 @@ export default {
   },
 
   methods: {
+    async expandInvoice({ item, value }) {
+      const selectedIndex = this.invoices.indexOf(item);
+      if (value) {
+        try {
+          this.$store.commit('SET_LOADING', true);
+          const { data } = await axios({
+            method: 'GET',
+            url: `${this.baseUrl}/invoices/${item._id}`,
+          });
+
+          const expandedInvoice = data;
+          expandedInvoice.dueDate = new Date(expandedInvoice.dueDate).toISOString().split('T')[0];
+          expandedInvoice.dateRange = `${new Date(expandedInvoice.startDate).toISOString().split('T')[0]} -> ${new Date(expandedInvoice.endDate).toISOString().split('T')[0]}`;
+
+          this.invoices.splice(selectedIndex, 1, expandedInvoice);
+        } catch (error) {
+          this.$store.commit(
+            'SET_ERROR',
+            error.response.data.message || error.response.data,
+          );
+        } finally {
+          this.$store.commit('SET_LOADING', false);
+        }
+      }
+    },
     auth() {
       const token = localStorage.getItem('token');
       if (token) {
@@ -214,7 +286,7 @@ export default {
           if (diffDays <= 5) {
             invoice.alert = true;
           }
-          invoice.dueDateParsed = new Date(invoice.dueDate).toISOString().split('T')[0];
+          invoice.dueDate = new Date(invoice.dueDate).toISOString().split('T')[0];
           invoice.dateRange = `${new Date(invoice.startDate).toISOString().split('T')[0]} -> ${new Date(invoice.endDate).toISOString().split('T')[0]}`;
         });
 
@@ -304,13 +376,15 @@ export default {
               type: this.editedItem.type,
             },
           });
-        }  else if (this.action === 'EDIT') {
+        } else if (this.action === 'EDIT') {
           const { data } = await axios({
             method: 'PATCH',
             url: `${this.baseUrl}/invoices/editInvoice`,
             data: {
               _id: this.editedItem._id,
               name: this.editedItem.name,
+              dueDate: this.editedItem.dueDate,
+              invoiceInfos: this.editedItem.invoiceInfos,
             },
           });
         }

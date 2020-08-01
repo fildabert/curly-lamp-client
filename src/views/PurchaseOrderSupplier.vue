@@ -1,9 +1,14 @@
 <template>
 <!-- eslint-disable max-len -->
-  <v-data-table :headers="headers" :search="search" :items="desserts" :loading="$store.state.loading" sort-by="calories" class="elevation-1" item-key="_id"
+  <v-data-table :headers="headers" :search="search" :items="desserts" :loading="$store.state.loading" class="elevation-1" item-key="_id"
     single-expand
     show-expand
-    :expanded.sync="expanded">
+    :expanded.sync="expanded"
+    :items-per-page="30"
+    show-select
+    :single-select="false"
+    v-model="selected"
+    @item-expanded="expandPO">
     <template v-slot:item.PONo="{ item }">
       <v-chip small :color="item.status === 'COMPLETED' ? 'green' : ''">{{ item.PONo }}</v-chip>
     </template>
@@ -11,13 +16,31 @@
       <v-toolbar flat color="white">
         <v-toolbar-title>Purchase Order(Supplier)</v-toolbar-title>
         <v-divider class="mx-4" inset vertical></v-divider>
+
         <v-text-field
-          v-model="search"
+          v-model="PONoFilter"
           prepend-icon="fas fa-search"
-          label="Search"
+          label="PO Number"
           single-line
           hide-details
         ></v-text-field>
+
+        <v-text-field
+          v-model="productFilter"
+          prepend-icon="fas fa-search"
+          label="Product"
+          single-line
+          hide-details
+        ></v-text-field>
+
+        <v-text-field
+          v-model="customerFilter"
+          prepend-icon="fas fa-search"
+          label="Supplier"
+          single-line
+          hide-details
+        ></v-text-field>
+
         <v-spacer></v-spacer>
         <v-dialog v-model="dialog" max-width="500px">
           <template v-slot:activator="{ on }">
@@ -233,14 +256,14 @@
     <template v-slot:item.action="{ item }">
       <v-tooltip bottom>
         <template v-slot:activator="{ on }">
-          <v-icon small class="mr-2" v-on="on" @click="increaseQuota(item)">fas fa-plus</v-icon>
+          <v-icon small class="mr-2" v-on="on" :disabled="selected.length > 0" @click="increaseQuota(item)">fas fa-plus</v-icon>
         </template>
           <span>Increase Quota</span>
       </v-tooltip>
 
       <v-tooltip bottom>
         <template v-slot:activator="{ on }">
-          <v-icon small class="mr-2" v-on="on" @click="toggleStatus(item)">fas fa-check</v-icon>
+          <v-icon small class="mr-2" v-on="on" :disabled="selected.length > 0" @click="toggleStatus(item)">fas fa-check</v-icon>
         </template>
           <span>Toggle Status</span>
       </v-tooltip>
@@ -254,14 +277,14 @@
 
       <v-tooltip bottom>
         <template v-slot:activator="{ on }">
-          <v-icon small class="mr-2" v-on="on" @click="clickEdit(item)">fas fa-edit</v-icon>
+          <v-icon small class="mr-2" v-on="on" :disabled="selected.length > 0" @click="clickEdit(item)">fas fa-edit</v-icon>
         </template>
           <span>Edit</span>
       </v-tooltip>
 
       <v-tooltip bottom>
         <template v-slot:activator="{ on }">
-          <v-icon small class="mr-2" v-on="on" @click="deleteItem(item)">fas fa-trash</v-icon>
+          <v-icon small class="mr-2" v-on="on" :disabled="selected.length > 0" @click="deleteItem(item)">fas fa-trash</v-icon>
         </template>
           <span>Delete</span>
       </v-tooltip>
@@ -272,12 +295,12 @@
       <td :colspan="headers.length">
         <v-list subheader dense>
           <v-subheader>Delivery Orders</v-subheader>
-          <v-list-item-group>
-            <v-list-item v-for="t in item.transactions.slice((page-1) * 5, ((page-1) + 1) * 5)" :key="t._id" selectable>
+          <v-list-item-group v-if="item.transactions.length > 0 && typeof item.transactions[0] !== 'string'">
+            <v-list-item v-for="t in item.transactions.slice((page-1) * 40, ((page-1) + 1) * 40)" :key="t._id" selectable>
               <v-list-item-content>
                 <v-list-item-title @click="$router.push(`/delivery-order?id=${t._id}`)">
                   D.O:
-                  <v-chip small>{{ t.invoice }}</v-chip> delivered at
+                  <v-chip small>{{ t.invoice }}</v-chip> [{{ t.productId.name }}] <v-chip small> {{ t.actualAmount || t.amount }} </v-chip> Tons delivered at
                   <v-chip small v-if="t.dateDelivered">{{ new Date(t.dateDelivered).toISOString().split('T')[0] }}</v-chip>
                   - status:
                   <v-chip small :color="t.status === 'COMPLETED' ? 'green' : 'orange lighten-1'">
@@ -288,10 +311,10 @@
             </v-list-item>
           </v-list-item-group>
           <v-pagination
-          v-if="item.transactions.length > 5"
+          v-if="item.transactions.length > 40"
           v-model="page"
           @click="() => console.log(page)"
-          :length="Math.ceil(item.transactions.length/5)"
+          :length="Math.ceil(item.transactions.length/40)"
           ></v-pagination>
         </v-list>
       </td>
@@ -326,20 +349,6 @@ export default {
     search: '',
     dialog: false,
     modalDate: false,
-    headers: [
-      { text: 'PO Number', value: 'PONo', align: 'left' },
-      {
-        text: 'Product',
-        sortable: false,
-        value: 'productId.name',
-      },
-      { text: 'Supplier', value: 'customerName' },
-      { text: 'Total Amount (tons)', value: 'totalAmount' },
-      { text: 'Orders Completed (tons)', value: 'ordersCompleted' },
-      { text: 'Date Issued', value: 'dateIssued' },
-      { text: 'Buying price (per unit)', value: 'price' },
-      { text: 'Actions', value: 'action', sortable: false },
-    ],
     desserts: [],
     editedIndex: -1,
     newOrder: {},
@@ -349,12 +358,52 @@ export default {
     customerList: [],
     customerNameList: [],
     expanded: [],
+    selected: [],
     modalDate1: false,
     modalDate2: false,
     modifiedOrder: {},
+    productFilter: '',
+    customerFilter: '',
+    PONoFilter: '',
   }),
 
   computed: {
+    headers() {
+      return [
+        {
+          text: 'PO Number',
+          value: 'PONo',
+          align: 'left',
+          filter: (value) => {
+            if (!this.PONoFilter) return true;
+            return value.toString().toLowerCase().includes(this.PONoFilter.toLowerCase());
+          },
+        },
+        {
+          text: 'Product',
+          sortable: false,
+          value: 'productId.name',
+          filter: (value) => {
+            if (!this.productFilter) return true;
+            return value.toString().toLowerCase().includes(this.productFilter.toLowerCase());
+          },
+        },
+        {
+          text: 'Supplier',
+          value: 'customerName',
+          filter: (value) => {
+            if (!this.customerFilter) return true;
+            return value.toString().toLowerCase().includes(this.customerFilter.toLowerCase());
+          },
+
+        },
+        { text: 'Total Amount (tons)', value: 'totalAmount' },
+        { text: 'Orders Completed (tons)', value: 'ordersCompleted' },
+        { text: 'Date Issued', value: 'dateIssued' },
+        { text: 'Buying price (per unit)', value: 'price' },
+        { text: 'Actions', value: 'action', sortable: false },
+      ];
+    },
     formTitle() {
       return this.editedIndex === -1 ? 'New PO' : 'Edit PO';
     },
@@ -396,6 +445,33 @@ export default {
         }
       }
     },
+
+    async expandPO({ item, value }) {
+      const selectedIndex = this.desserts.indexOf(item);
+      if (value) {
+        try {
+          this.$store.commit('SET_LOADING', true);
+          const { data } = await axios({
+            method: 'GET',
+            url: `${this.baseUrl}/purchase-orders/${item._id}`,
+          });
+
+          const expandedPO = data;
+          expandedPO.dateIssued = expandedPO.dateIssued ? new Date(expandedPO.dateIssued).toISOString().split('T')[0] : '';
+          expandedPO.productPrice = data.productId.price;
+
+          this.desserts.splice(selectedIndex, 1, expandedPO);
+        } catch (error) {
+          this.$store.commit(
+            'SET_ERROR',
+            error.response.data.message || error.response.data,
+          );
+        } finally {
+          this.$store.commit('SET_LOADING', false);
+        }
+      }
+    },
+
     async initialize() {
       try {
         this.$store.commit('SET_LOADING', true);
@@ -567,15 +643,29 @@ export default {
             },
           });
         } else if (this.action === 'PRINT') {
-          const { data } = await axios({
-            method: 'GET',
-            url: `${this.baseUrl}/purchase-orders/print/${this.newOrder._id}?startDate=${this.modifiedOrder.startDate}&endDate=${this.modifiedOrder.endDate}&dueDate=${this.modifiedOrder.dueDate}&invoiceName=${this.modifiedOrder.invoiceName}`,
-            responseType: 'blob',
-          });
-          FileSaver.saveAs(
-            data,
-            `Invoice[${this.newOrder.PONo}]/${this.newOrder.productId.name}.xlsx`,
-          );
+          if (this.selected.length > 0) {
+            await axios({
+              method: 'POST',
+              url: `${this.baseUrl}/purchase-orders/printMany`,
+              data: {
+                orderIds: this.selected.map((order) => order._id),
+                startDate: this.modifiedOrder.startDate,
+                endDate: this.modifiedOrder.endDate,
+                dueDate: this.modifiedOrder.dueDate,
+                invoiceName: this.modifiedOrder.invoiceName,
+              },
+            });
+          } else {
+            const { data } = await axios({
+              method: 'GET',
+              url: `${this.baseUrl}/purchase-orders/print/${this.newOrder._id}?startDate=${this.modifiedOrder.startDate}&endDate=${this.modifiedOrder.endDate}&dueDate=${this.modifiedOrder.dueDate}&invoiceName=${this.modifiedOrder.invoiceName}`,
+              responseType: 'blob',
+            });
+            FileSaver.saveAs(
+              data,
+              `Invoice[${this.newOrder.PONo}]/${this.newOrder.productId.name}.xlsx`,
+            );
+          }
         }
         await this.initialize();
         this.close();

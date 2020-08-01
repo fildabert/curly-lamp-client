@@ -1,11 +1,18 @@
 <template>
 <!-- eslint-disable linebreak-style -->
 <!-- eslint-disable max-len -->
-  <v-data-table :headers="headers" :items="cashFlows" :loading="$store.state.loading" sort-by="calories" class="elevation-1">
+  <v-data-table :headers="headers" :items="cashFlows" :loading="$store.state.loading" :search="search" sort-by="calories" class="elevation-1">
     <template v-slot:top>
       <v-toolbar flat color="white">
         <v-toolbar-title>Balance: {{ balance.toLocaleString() }}</v-toolbar-title>
         <v-divider class="mx-4" inset vertical></v-divider>
+        <v-text-field
+          v-model="search"
+          prepend-icon="fas fa-search"
+          label="Search"
+          single-line
+          hide-details
+        ></v-text-field>
         <v-spacer></v-spacer>
         <v-dialog v-model="dialog" max-width="500px">
           <template v-slot:activator="{ on }">
@@ -135,6 +142,7 @@ export default {
         text: 'Actions', value: 'action', sortable: false, align: 'right',
       },
     ],
+    search: '',
     balance: 0,
     cashFlows: [],
     customerNameList: [],
