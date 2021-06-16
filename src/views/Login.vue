@@ -11,9 +11,10 @@
     </v-col>
   </v-row>
 
-    <h3>Login</h3>
+    <h3 class="white--text">Login</h3>
     <v-text-field
       v-model="username"
+      color="white"
       :rules="[v => !!v || 'Username is required']"
       label="Username"
       required
