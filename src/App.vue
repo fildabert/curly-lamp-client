@@ -14,21 +14,28 @@
       <v-app-bar app clipped-left color="#FFFFFF">
         <v-app-bar-nav-icon @click="drawer = !drawer" />
                 <!-- <v-img src="https://trustyourperceptions.files.wordpress.com/2016/05/1280px-human_semen_in_a_petri_dish-e1462598125307.jpg" max-height="80" max-width="80"></v-img> -->
-        <v-img src="./assets/sinoma-logo.png" max-height="300" max-width="500"></v-img>
+        <v-img src="./assets/wls-logo.jpg" max-height="100" max-width="100"></v-img>
 
         <v-spacer></v-spacer>
         <v-list rounded dense style='max-height: 63px;' class="mb-3">
           <v-list-item-group color="primary">
           <v-list-item>
             <div></div>
-          <v-list-item-avatar class="mr-3">
-            <v-avatar :color="'#'+(Math.random()*0xFFFFFF<<0).toString(16)" style="padding-right: 7px;">
+          <v-list-item-avatar class="mr-2">
+            <v-avatar v-if="!$store.state.user.picture" :color="'#'+(Math.random()*0xFFFFFF<<0).toString(16)" style="padding-right: 7px;">
               <!-- <v-img src="./assets/dapis.png" max-height="90" max-width="50"></v-img> -->
               <span class="white--text headline">{{$store.state.user.username.split("")[0].toUpperCase()}}</span>
             </v-avatar>
+
+            <v-avatar v-else style="padding-right: 3px;">
+              <img
+                :src="$store.state.user.picture"
+                alt="John"
+              >
+            </v-avatar>
           </v-list-item-avatar>
           <v-list-item-content>
-            <v-list-item-title v-text="$store.state.user.username"></v-list-item-title>
+            <v-list-item-title v-text="$store.state.user.fullName || $store.state.user.username"></v-list-item-title>
           </v-list-item-content>
 
           <v-list-item-action>
@@ -45,7 +52,7 @@
               <v-icon>far fa-list-alt</v-icon>
             </v-list-item-action>
             <v-list-item-content>
-              <v-list-item-title class="black--text">Purchase Order(Buyer)</v-list-item-title>
+              <v-list-item-title class="black--text">Purchase Order (Buyer)</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -56,61 +63,97 @@
               <v-icon>fas fa-list-alt</v-icon>
             </v-list-item-action>
             <v-list-item-content>
-              <v-list-item-title class="black--text">Purchase Order(Supplier)</v-list-item-title>
+              <v-list-item-title class="black--text">Purchase Order (Supplier)</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
           <v-list-item @click="$router.push('/deliveries')">
-            <v-list-item-action>
-              <v-icon>fas fa-truck</v-icon>
-            </v-list-item-action>
-            <v-list-item-content>
-              <v-list-item-title class="black--text">Deliveries</v-list-item-title>
-            </v-list-item-content>
+            <v-row no-gutters>
+              <v-col cols="2">
+                <v-list-item-action>
+                  <v-icon>fas fa-truck</v-icon>
+                </v-list-item-action>
+              </v-col>
+
+              <v-col cols="8" offset-sm="1" align-self="center">
+                <v-list-item-content>
+                  <v-list-item-title class="black--text">Deliveries</v-list-item-title>
+                </v-list-item-content>
+              </v-col>
+            </v-row>
           </v-list-item>
 
           <v-list-item @click="$router.push('/product-management')">
-            <v-list-item-action>
-              <v-icon color="">fas fa-book</v-icon>
-            </v-list-item-action>
-            <v-list-item-content>
-              <v-list-item-title class="black--text">Product Management</v-list-item-title>
-            </v-list-item-content>
+            <v-row no-gutters>
+                <v-col cols="2">
+                  <v-list-item-action>
+                    <v-icon color="">fas fa-book</v-icon>
+                  </v-list-item-action>
+                </v-col>
+
+                <v-col cols="8" offset-sm="1" align-self="center">
+                  <v-list-item-content>
+                      <v-list-item-title class="black--text">Product Management</v-list-item-title>
+                    </v-list-item-content>
+
+                </v-col>
+            </v-row>
           </v-list-item>
 
           <v-list-item @click="$router.push('/customer-management')">
-            <v-list-item-action>
-              <v-icon>fas fa-user</v-icon>
-            </v-list-item-action>
-            <v-list-item-content>
-              <v-list-item-title class="black--text">Customer Management</v-list-item-title>
-            </v-list-item-content>
+            <v-row no-gutters>
+              <v-col cols="2">
+                <v-list-item-action>
+                  <v-icon>fas fa-user</v-icon>
+                </v-list-item-action>
+              </v-col>
+
+              <v-col cols="8" offset-sm="1" align-self="center">
+                 <v-list-item-content>
+                  <v-list-item-title class="black--text">Customer Management</v-list-item-title>
+                </v-list-item-content>
+              </v-col>
+            </v-row>
           </v-list-item>
 
         <v-list-item @click="$router.push('/cashflow')">
-            <v-list-item-action>
-              <v-icon>fa-money-check-alt</v-icon>
-            </v-list-item-action>
-            <v-list-item-content>
-              <v-list-item-title class="black--text">Cash Flow</v-list-item-title>
-            </v-list-item-content>
-          </v-list-item>
+          <v-row no-gutters>
+              <v-col cols="2">
+                <v-list-item-action>
+                  <v-icon>fa-money-check-alt</v-icon>
+                </v-list-item-action>
+              </v-col>
+
+              <v-col cols="8" offset-sm="1" align-self="center">
+                 <v-list-item-content>
+                  <v-list-item-title class="black--text">Cash Flow</v-list-item-title>
+                </v-list-item-content>
+              </v-col>
+          </v-row>
+        </v-list-item>
 
         <v-list-item @click="$router.push('/invoice-buyer')">
-            <v-list-item-action>
-              <v-icon color="">fa-clipboard-list</v-icon>
-            </v-list-item-action>
-            <v-list-item-content>
-              <v-list-item-title class="black--text">Invoice(Receivable)</v-list-item-title>
-            </v-list-item-content>
+          <v-row no-gutters>
+                <v-col cols="2">
+                  <v-list-item-action>
+                    <v-icon color="">fa-clipboard-list</v-icon>
+                  </v-list-item-action>
+                </v-col>
+
+                <v-col cols="8" offset-sm="1" align-self="center">
+                  <v-list-item-content>
+                    <v-list-item-title class="black--text">Invoice (Receivable)</v-list-item-title>
+                  </v-list-item-content>
+                </v-col>
+          </v-row>
           </v-list-item>
 
-          <v-list-item @click="$router.push('/invoice-supplier')">
+          <v-list-item @click="$router.push('/invoice-supplier')" v-if="$store.state.user.admin >= 2">
             <v-list-item-action>
               <v-icon color="">fa-clipboard-list</v-icon>
             </v-list-item-action>
             <v-list-item-content>
-              <v-list-item-title class="black--text">Invoice(Payable)</v-list-item-title>
+              <v-list-item-title class="black--text">Invoice (Payable)</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -131,7 +174,7 @@
         >{{ $store.state.infoMessage }}</v-snackbar>
         <v-container>
           <transition name="fade">
-            <keep-alive exclude="Details" v-if="!destroyit">
+            <keep-alive :exclude="['Details', 'CashFlow', 'Customer', 'InvoiceBuyer', 'InvoiceSupplier']" v-if="!destroyit">
               <router-view @destroypls="hello" v-if="!destroyit"></router-view>
             </keep-alive>
 
@@ -178,6 +221,19 @@ export default {
     destroyit: false,
   }),
   methods: {
+    auth(clearanceLvl) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const userData = checkLogin(token);
+        if (userData) {
+          if (userData.admin < clearanceLvl) {
+            throw { response: { data: { message: 'Unauthorized' } } };
+          }
+        } else {
+          this.$store.commit('SET_LOGIN', { isLogin: false, user: {} });
+        }
+      }
+    },
     logout() {
       this.$store.commit('SET_LOGIN', { isLogin: false, user: {} });
       localStorage.removeItem('token');
@@ -191,6 +247,11 @@ export default {
 </script>
 
 <style>
+
+#grad {
+  background-image: linear-gradient(to bottom right, #003973, #E5E5BE);
+}
+
 #wallpaper {
   /* background-image: url('./assets/weed-wallpaper.jpg'); */
   background-position: center;
