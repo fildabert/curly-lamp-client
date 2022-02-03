@@ -5,11 +5,12 @@
   item-key="_id"
     single-expand
     show-expand
+    :items-per-page="30"
     @item-expanded="expandInvoice"
     :expanded.sync="expanded">
     <template v-slot:top>
       <v-toolbar flat color="white">
-        <v-toolbar-title>Invoice(Buyer)</v-toolbar-title>
+        <v-toolbar-title>Invoice (Receivable)</v-toolbar-title>
         <v-divider class="mx-4" inset vertical></v-divider>
         <v-text-field
           v-model="search"
@@ -47,6 +48,7 @@
                               prepend-icon="fas fa-calendar"
                               readonly
                               required
+                              :disabled="$store.state.user.admin < 3"
                               :rules="[v => !!v || 'Due Date is required']"
                               v-on="on"
                             ></v-text-field>
@@ -68,10 +70,10 @@
                       <v-text-field v-model="editedItem.invoiceInfos[index].product.name" label="Product" aria-required disabled></v-text-field>
                     </v-col>
                     <v-col cols="3" sm="3" md="3">
-                      <v-text-field v-model="editedItem.invoiceInfos[index].totalQuantity" label="Quantity" aria-required></v-text-field>
+                      <v-text-field v-model="editedItem.invoiceInfos[index].totalQuantity" label="Quantity" aria-required :disabled="$store.state.user.admin < 2"></v-text-field>
                     </v-col>
                     <v-col cols="3" sm="3" md="3">
-                     <v-text-field v-model="editedItem.invoiceInfos[index].price" label="Price" aria-required></v-text-field>
+                     <v-text-field v-model="editedItem.invoiceInfos[index].price" label="Price" aria-required :disabled="$store.state.user.admin < 3"></v-text-field>
                     </v-col>
                     <v-col cols="3" sm="3" md="3">
                      <v-text-field :value="editedItem.invoiceInfos[index].totalQuantity * editedItem.invoiceInfos[index].price" label="Total Amount" aria-required disabled></v-text-field>
@@ -108,8 +110,8 @@
       <span>{{ item.quantity.toLocaleString() }}</span>
     </template>
 
-    <template v-slot:item.name="{ item, header, value }">
-      <v-chip small>{{ item.name }}</v-chip>
+    <template v-slot:item.name="{ item, header, value }" >
+      <v-chip small :color="item.duplicate ? 'pink lighten-2' : '' ">{{ item.name }}</v-chip>
     </template>
 
     <template v-slot:expanded-item="{ headers, item }">
@@ -120,14 +122,37 @@
           <v-list-item-group>
             <v-list-item v-for="t in item.transactions.slice((page-1) * 30, ((page-1) + 1) * 30)" :key="t._id" selectable>
               <v-list-item-content>
-                <v-list-item-title @click="$router.push(`/delivery-order?id=${t._id}`)">
-                  D.O:
-                  <v-chip small>{{ t.invoice }}</v-chip> <v-chip small> {{ t.actualAmount || t.amount }} </v-chip> Tons delivered at
-                  <v-chip small v-if="t.dateDelivered">{{ new Date(t.dateDelivered).toISOString().split('T')[0] }}</v-chip>
-                  - status:
-                  <v-chip small :color="t.status === 'COMPLETED' ? 'green' : 'orange lighten-1'">
-                  {{ t.status }}
-                  </v-chip>
+                <v-list-item-title>
+                <v-row dense no-gutters>
+                  <v-col cols="auto" class="mr-auto" @click="$router.push(`/delivery-order?id=${t._id}`)">
+                      D.O:
+                    <v-chip small>{{ t.invoice }}</v-chip> <span v-if="t.productId">[{{ t.productId.name }}]</span> <v-chip small> {{ t.actualAmount || t.amount }} </v-chip>
+                    <span v-if="t.productId">{{ t.productId.unit }}</span>  delivered at
+                    <v-chip small v-if="t.dateDelivered">{{ new Date(t.dateDelivered).toISOString().split('T')[0] }}</v-chip>
+                    - status:
+                    <v-chip small :color="t.status === 'COMPLETED' ? 'green' : 'orange lighten-1'">
+                    {{ t.status }}
+                    </v-chip>
+                    <v-tooltip v-if="transactionMap[t._id] ? transactionMap[t._id].length > 1 : false" bottom>
+                      <template v-slot:activator="{ on }">
+                        <v-icon small color="orange" v-on="on">fas fa-exclamation-triangle</v-icon>
+                      </template>
+                      <span>{{ transactionMap[t._id].length }} duplicates found in {{ JSON.stringify(transactionMap[t._id].map((trx) => trx.name)) }}</span>
+                   </v-tooltip>
+
+                  </v-col>
+
+                  <v-col cols="auto">
+                    <v-tooltip bottom>
+                      <template v-slot:activator="{ on }">
+                        <v-icon small class="mr-2" v-on="on" @click="takeOutDeliveryOrder(item, t)">fas fa-minus</v-icon>
+                      </template>
+                      <span>Remove</span>
+                   </v-tooltip>
+                  </v-col>
+
+                </v-row>
+
                 </v-list-item-title>
               </v-list-item-content>
             </v-list-item>
@@ -172,18 +197,20 @@ import axios from 'axios';
 import { checkLogin } from '../helpers/authorization';
 
 export default {
+  name: 'InvoiceBuyer',
   data: () => ({
     baseUrl: '',
     search: '',
     dialog: false,
+    modalDate: false,
     headers: [
       { text: 'Buyer', value: 'customer.name' },
       { text: 'Invoice No', value: 'name' },
       // { text: 'Purchase Order', value: 'purchaseOrder' },
       { text: 'Date Range', value: 'dateRange' },
-      { text: 'Quantity(Tons)', value: 'quantity' },
-      { text: 'Total Amount', value: 'totalAmount' },
-      { text: 'Due Date', value: 'dueDate' },
+      { text: 'Quantity', value: 'quantity', width: '100' },
+      { text: 'Total Amount', value: 'totalAmount', width: '130' },
+      { text: 'Due Date', value: 'dueDate', width: '130' },
       { text: 'Amount Paid', value: 'amountPaid' },
       {
         text: 'Actions', value: 'action', sortable: false, align: 'right',
@@ -201,6 +228,7 @@ export default {
     },
     action: '',
     page: 1,
+    transactionMap: {},
   }),
 
   computed: {
@@ -227,13 +255,15 @@ export default {
   },
 
   created() {
+    document.title = this.$route.meta.title;
     this.baseUrl = this.$store.state.baseUrl;
     this.initialize();
   },
 
   methods: {
     async expandInvoice({ item, value }) {
-      const selectedIndex = this.invoices.indexOf(item);
+      console.log(item, value, 'halo');
+      const selectedIndex = this.invoices.findIndex((inv) => inv._id === item._id);
       if (value) {
         try {
           this.$store.commit('SET_LOADING', true);
@@ -242,7 +272,22 @@ export default {
             url: `${this.baseUrl}/invoices/${item._id}`,
           });
 
+          const diffTime = new Date(data.dueDate) - new Date();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          data.alert = false;
+          if (diffDays <= 0) {
+            data.alert = true;
+          }
+
+          data.duplicate = false;
+          data.transactions.forEach((trx) => {
+            if (this.transactionMap[trx._id].length > 1) {
+              data.duplicate = true;
+            }
+          });
+
           const expandedInvoice = data;
+
           expandedInvoice.dueDate = new Date(expandedInvoice.dueDate).toISOString().split('T')[0];
           expandedInvoice.dateRange = `${new Date(expandedInvoice.startDate).toISOString().split('T')[0]} -> ${new Date(expandedInvoice.endDate).toISOString().split('T')[0]}`;
 
@@ -257,12 +302,12 @@ export default {
         }
       }
     },
-    auth() {
+    auth(clearanceLvl) {
       const token = localStorage.getItem('token');
       if (token) {
         const userData = checkLogin(token);
         if (userData) {
-          if (!userData.admin) {
+          if (userData.admin < clearanceLvl) {
             throw { response: { data: { message: 'Unauthorized' } } };
           }
         } else {
@@ -270,26 +315,40 @@ export default {
         }
       }
     },
-    async initialize() {
+    async initialize(needUpdateExpandedInvoice) {
       try {
         this.$store.commit('SET_LOADING', true);
         const { data } = await axios({
           method: 'GET',
           url: `${this.baseUrl}/invoices/all/buyer`,
         });
-
+        this.transactionMap = {};
         data.forEach((invoice) => {
           const diffTime = new Date(invoice.dueDate) - new Date();
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           invoice.alert = false;
-          if (diffDays <= 5) {
+          if (diffDays <= 0) {
             invoice.alert = true;
           }
           invoice.dueDate = new Date(invoice.dueDate).toISOString().split('T')[0];
           invoice.dateRange = `${new Date(invoice.startDate).toISOString().split('T')[0]} -> ${new Date(invoice.endDate).toISOString().split('T')[0]}`;
+          invoice.transactions.forEach((transaction) => {
+            if (!this.transactionMap[transaction]) {
+              this.transactionMap[transaction] = [invoice];
+            } else {
+              this.transactionMap[transaction].push(invoice);
+
+              this.transactionMap[transaction].forEach((inv) => {
+                inv.duplicate = true;
+              });
+            }
+          });
         });
 
         this.invoices = data;
+        if (needUpdateExpandedInvoice) {
+          await this.expandInvoice({ item: needUpdateExpandedInvoice, value: true });
+        }
         this.editedItem = {};
         console.log(data);
       } catch (error) {
@@ -352,6 +411,28 @@ export default {
           await this.initialize();
         } catch (error) {
           this.$store.commit('SET_ERROR', error.response.data.message);
+        }
+      }
+    },
+
+    async takeOutDeliveryOrder(invoice, transaction) {
+      if (confirm('Do u really wanna do this?')) {
+        try {
+          // this.auth(2);
+          const { data } = await axios({
+            method: 'PATCH',
+            url: `${this.baseUrl}/invoices/takeOutDeliveryOrder`,
+            data: {
+              invoiceId: invoice._id,
+              transactionId: transaction._id,
+            },
+          });
+          await this.initialize(invoice);
+        } catch (error) {
+          this.$store.commit('SET_ERROR', error.response.data.message);
+        } finally {
+          this.$store.commit('SET_LOADING', false);
+          this.close();
         }
       }
     },

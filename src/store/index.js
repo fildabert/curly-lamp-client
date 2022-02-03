@@ -36,8 +36,6 @@ export default new Vuex.Store({
       state.user = payload.user;
     },
   },
-  actions: {
-  },
-  modules: {
-  },
+  actions: {},
+  modules: {},
 });

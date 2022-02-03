@@ -1,7 +1,7 @@
 <template>
 <!-- eslint-disable linebreak-style -->
 <!-- eslint-disable max-len -->
-  <v-data-table :headers="headers" :items="desserts" :loading="$store.state.loading" sort-by="calories" class="elevation-1">
+  <v-data-table :headers="headers" :items="desserts" :loading="$store.state.loading" sort-by="calories" class="elevation-1" :items-per-page="30">
     <template v-slot:top>
       <v-toolbar flat color="white">
         <v-toolbar-title>Customers</v-toolbar-title>
@@ -69,7 +69,7 @@
     </template>
 
     <template v-slot:item.balance="{ item, header, value }">
-      <span>{{ item.type === 'BUYER' ? item.balance.toLocaleString() : '-' }}</span>
+      <span>{{ item.balance.toLocaleString() }}</span>
     </template>
   </v-data-table>
 </template>
@@ -85,20 +85,10 @@ import axios from 'axios';
 import { checkLogin } from '../helpers/authorization';
 
 export default {
+  name: 'Customer',
   data: () => ({
     baseUrl: '',
     dialog: false,
-    headers: [
-      { text: 'Name', value: 'name' },
-      { text: 'Phone', value: 'phone' },
-      { text: 'Address', value: 'address' },
-      { text: 'NPWP', value: 'npwp' },
-      { text: 'Type', value: 'type' },
-      { text: 'Balance', value: 'balance' },
-      {
-        text: 'Actions', value: 'action', sortable: false, align: 'right',
-      },
-    ],
     desserts: [],
     editedIndex: -1,
     editedItem: {
@@ -112,6 +102,24 @@ export default {
   }),
 
   computed: {
+    headers() {
+      const headers = [
+        { text: 'Name', value: 'name' },
+        { text: 'Address', value: 'address' },
+        { text: 'NPWP', value: 'npwp' },
+        { text: 'Type', value: 'type' },
+        { text: 'Balance', value: 'balance' },
+        {
+          text: 'Actions', value: 'action', sortable: false, align: 'right',
+        },
+      ];
+
+      if (this.$store.state.user.admin < 2) {
+        const index = headers.findIndex((header) => header.text === 'Balance');
+        headers.splice(index, 1);
+      }
+      return headers;
+    },
     formTitle() {
       return this.editedIndex === -1 ? 'New Customer' : 'Edit Customer';
     },
@@ -125,17 +133,18 @@ export default {
   },
 
   created() {
+    document.title = this.$route.meta.title;
     this.baseUrl = this.$store.state.baseUrl;
     this.initialize();
   },
 
   methods: {
-    auth() {
+    auth(clearanceLvl) {
       const token = localStorage.getItem('token');
       if (token) {
         const userData = checkLogin(token);
         if (userData) {
-          if (!userData.admin) {
+          if (userData.admin < clearanceLvl) {
             throw { response: { data: { message: 'Unauthorized' } } };
           }
         } else {

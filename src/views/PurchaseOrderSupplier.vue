@@ -14,7 +14,7 @@
     </template>
     <template v-slot:top>
       <v-toolbar flat color="white">
-        <v-toolbar-title>Purchase Order(Supplier)</v-toolbar-title>
+        <v-toolbar-title>Purchase Order (Supplier)</v-toolbar-title>
         <v-divider class="mx-4" inset vertical></v-divider>
 
         <v-text-field
@@ -306,6 +306,12 @@
                   <v-chip small :color="t.status === 'COMPLETED' ? 'green' : 'orange lighten-1'">
                   {{ t.status }}
                   </v-chip>
+                  <v-tooltip bottom v-if="transactionMap[t._id] > 1">
+                    <template v-slot:activator="{ on }">
+                      <v-icon small class="ml-1" color="blue" v-on="on">fas fa-check-circle</v-icon>
+                    </template>
+                    <span>DO Issued</span>
+                  </v-tooltip>
                 </v-list-item-title>
               </v-list-item-content>
             </v-list-item>
@@ -365,11 +371,12 @@ export default {
     productFilter: '',
     customerFilter: '',
     PONoFilter: '',
+    transactionMap: {},
   }),
 
   computed: {
     headers() {
-      return [
+      const headers = [
         {
           text: 'PO Number',
           value: 'PONo',
@@ -397,12 +404,19 @@ export default {
           },
 
         },
-        { text: 'Total Amount (tons)', value: 'totalAmount' },
-        { text: 'Orders Completed (tons)', value: 'ordersCompleted' },
+        { text: 'Total Amount', value: 'totalAmount' },
+        { text: 'Orders Completed', value: 'ordersCompleted' },
         { text: 'Date Issued', value: 'dateIssued' },
         { text: 'Buying price (per unit)', value: 'price' },
         { text: 'Actions', value: 'action', sortable: false },
       ];
+
+      if (this.$store.state.user.admin < 2) {
+        const index = headers.findIndex((header) => header.text === 'Buying price (per unit)');
+        headers.splice(index, 1);
+      }
+
+      return headers;
     },
     formTitle() {
       return this.editedIndex === -1 ? 'New PO' : 'Edit PO';
@@ -417,27 +431,30 @@ export default {
     $route: {
       immediate: true,
       handler(to, from) {
-        if ((from.name === 'PurchaseOrderSupplier' && to.name === 'Details') || (from.name === 'Details' && to.name === 'PurchaseOrderSupplier')) {
-          this.$emit('destroypls', false);
-        } else {
-          this.$emit('destroypls', true);
+        if (to && from) {
+          if ((from.name === 'PurchaseOrderSupplier' && to.name === 'Details') || (from.name === 'Details' && to.name === 'PurchaseOrderSupplier')) {
+            this.$emit('destroypls', false);
+          } else {
+            this.$emit('destroypls', true);
+          }
         }
       },
     },
   },
 
   created() {
+    document.title = this.$route.meta.title;
     this.baseUrl = this.$store.state.baseUrl;
     this.initialize();
   },
 
   methods: {
-    auth() {
+    auth(clearanceLvl) {
       const token = localStorage.getItem('token');
       if (token) {
         const userData = checkLogin(token);
         if (userData) {
-          if (!userData.admin) {
+          if (userData.admin < clearanceLvl) {
             throw { response: { data: { message: 'Unauthorized' } } };
           }
         } else {
@@ -475,16 +492,50 @@ export default {
     async initialize() {
       try {
         this.$store.commit('SET_LOADING', true);
-        var { data } = await axios({
+
+        const promises = [];
+
+        const getPOSupplier = axios({
           method: 'GET',
           url: `${this.baseUrl}/purchase-orders/supplier`,
         });
 
-        this.desserts = data;
+        const getInvoiceSupplier = axios({
+          method: 'GET',
+          url: `${this.baseUrl}/invoices/all/supplier`,
+        });
+
+        promises.push(getPOSupplier);
+        promises.push(getInvoiceSupplier);
+
+        const promiseResult = await Promise.all(promises);
+
+        this.desserts = promiseResult[0].data;
+        const invoiceSupplier = promiseResult[1].data;
 
         this.desserts.forEach((dessert) => {
           dessert.ProductId = dessert.productId._id;
           if (dessert.dateIssued) dessert.dateIssued = new Date(dessert.dateIssued).toISOString().split('T')[0];
+
+          dessert.transactions.forEach((trx) => {
+            if (!this.transactionMap[trx]) {
+              this.transactionMap[trx] = 1;
+            } else {
+              this.transactionMap[trx] += 1;
+            }
+          });
+        });
+
+        invoiceSupplier.forEach((invoice) => {
+          invoice.transactions.forEach((transaction) => {
+            if (invoice.type === 'SUPPLIER') {
+              if (!this.transactionMap[transaction]) {
+                this.transactionMap[transaction] = 1;
+              } else {
+                this.transactionMap[transaction] += 1;
+              }
+            }
+          });
         });
 
         if (this.customerList.length === 0) {
@@ -572,7 +623,7 @@ export default {
       // eslint-disable-next-line no-alert
       if (confirm('Do u really wanna do this?')) {
         try {
-          this.auth();
+          this.auth(2);
           const { data } = await axios({
             method: 'DELETE',
             url: `${this.baseUrl}/purchase-orders/${this.editedItem._id}`,
@@ -597,6 +648,7 @@ export default {
         this.$store.commit('SET_LOADING', true);
 
         if (this.action === 'NEW') {
+          this.auth(2);
           const customerIndex = this.customerList.findIndex((customer) => customer.name === this.newOrder.customerInput);
           const selectedCustomer = this.customerList[customerIndex];
           const { data } = await axios({
@@ -611,6 +663,7 @@ export default {
             },
           });
         } else if (this.action === 'EDIT') {
+          this.auth(2);
           this.$store.commit('SET_LOADING', true);
           const { data } = await axios({
             method: 'PUT',
@@ -643,6 +696,7 @@ export default {
             },
           });
         } else if (this.action === 'PRINT') {
+          this.auth(2);
           if (this.selected.length > 0) {
             await axios({
               method: 'POST',

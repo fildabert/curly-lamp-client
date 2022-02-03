@@ -7,13 +7,14 @@
   >
   <v-row>
     <v-col offset="4">
-        <v-img src="../assets/newlogo.png" max-height="200" max-width="400"></v-img>
+        <v-img src="../assets/wls-logo.jpg" max-height="200" max-width="400"></v-img>
     </v-col>
   </v-row>
 
-    <h3>Login</h3>
+    <h3 class="white--text">Login</h3>
     <v-text-field
       v-model="username"
+      color="white"
       :rules="[v => !!v || 'Username is required']"
       label="Username"
       required
@@ -91,7 +92,6 @@ export default {
     async googleLogin() {
       try {
         const GoogleUser = await this.$gAuth.signIn();
-        console.log(GoogleUser);
         const idToken = GoogleUser.getAuthResponse().id_token;
         const { data } = await axios({
           method: 'POST',

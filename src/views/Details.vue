@@ -123,6 +123,7 @@ import axios from 'axios';
 export default {
   name: 'Details',
   created() {
+    document.title = this.$route.meta.title;
     this.baseUrl = this.$store.state.baseUrl;
     this.initialize();
   },
@@ -152,6 +153,19 @@ export default {
     ],
   }),
   methods: {
+    auth(clearanceLvl) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const userData = checkLogin(token);
+        if (userData) {
+          if (userData.admin < clearanceLvl) {
+            throw { response: { data: { message: 'Unauthorized' } } };
+          }
+        } else {
+          this.$store.commit('SET_LOGIN', { isLogin: false, user: {} });
+        }
+      }
+    },
     async initialize() {
       this.$store.commit('SET_LOADING', true);
       try {

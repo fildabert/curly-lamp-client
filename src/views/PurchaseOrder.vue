@@ -554,19 +554,25 @@
       <td :colspan="headers.length">
         <v-list subheader dense>
           <v-subheader>Delivery Orders</v-subheader>
-          <v-list-item-group v-if="item.transactions.length > 0 && typeof item.transactions[0] !== 'string'">
+          <v-list-item-group v-if="item.transactions.length > 0 && (typeof item.transactions[0]) !== 'string'">
             <v-list-item v-for="t in item.transactions.slice((page-1) * 40, ((page-1) + 1) * 40)" :key="t._id" selectable>
               <v-list-item-content>
                 <v-list-item-title @click="$router.push(`/delivery-order?id=${t._id}`)">
                   D.O:
-                  <v-chip small>{{ t.invoice }}</v-chip> [{{ t.productId.name }}] <v-chip small> {{ t.actualAmount || t.amount }} </v-chip> Tons delivered at
+                  <v-chip small>{{ t.invoice }}</v-chip> [{{ t.productId.name }}] <v-chip small> {{ t.actualAmount || t.amount }} </v-chip> {{ t.productId.unit }} delivered at
                   <v-chip small v-if="t.dateDelivered">{{ new Date(t.dateDelivered).toISOString().split('T')[0] }}</v-chip>
                   - status:
                   <v-chip small :color="t.status === 'COMPLETED' ? 'green' : 'orange lighten-1'">
                   {{ t.status }}
                   </v-chip>
-                  <!-- <v-spacer></v-spacer>
-                  <v-icon small class="mr-2" v-on="on" @click="clickTrash(item)">fas fa-trash</v-icon> -->
+
+                  <v-tooltip bottom v-if="transactionMap[t._id] > 1">
+                    <template v-slot:activator="{ on }">
+                      <v-icon small class="ml-1" color="blue" v-on="on">fas fa-check-circle</v-icon>
+                    </template>
+                    <span>DO Issued</span>
+                  </v-tooltip>
+                  
                 </v-list-item-title>
               </v-list-item-content>
             </v-list-item>
@@ -579,6 +585,10 @@
           ></v-pagination>
         </v-list>
       </td>
+    </template>
+
+    <template v-slot:item.PONo="{ item, header, value }">
+      <v-chip small :color="item.issuedStatus ? 'green' : ''">{{ item.PONo }}</v-chip>
     </template>
 
     <template v-slot:item.ordersCompleted="{ item, header, value }">
@@ -671,6 +681,7 @@ export default {
     productFilter: '',
     customerFilter: '',
     PONoFilter: '',
+    transactionMap: {},
   }),
 
   computed: {
@@ -702,8 +713,8 @@ export default {
             return value.toString().toLowerCase().includes(this.customerFilter.toLowerCase());
           },
         },
-        { text: 'Total Amount (tons)', value: 'totalAmount' },
-        { text: 'Orders Completed (tons)', value: 'ordersCompleted' },
+        { text: 'Total Amount', value: 'totalAmount' },
+        { text: 'Orders Completed', value: 'ordersCompleted' },
         { text: 'Date Issued', value: 'dateIssued' },
         { text: 'Selling price (per unit)', value: 'price' },
         { text: 'Actions', value: 'action', sortable: false },
@@ -774,6 +785,7 @@ export default {
   },
 
   created() {
+    document.title = this.$route.meta.title;
     this.baseUrl = this.$store.state.baseUrl;
     const token = localStorage.getItem('token');
     if (token) {
@@ -791,6 +803,20 @@ export default {
   },
 
   methods: {
+    auth(clearanceLvl) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const userData = checkLogin(token);
+        if (userData) {
+          if (userData.admin < clearanceLvl) {
+            throw { response: { data: { message: 'Unauthorized' } } };
+          }
+        } else {
+          this.$store.commit('SET_LOGIN', { isLogin: false, user: {} });
+        }
+      }
+    },
+
     async expandPO({ item, value }) {
       const selectedIndex = this.desserts.indexOf(item);
       if (value) {
@@ -804,6 +830,14 @@ export default {
           const expandedPO = data;
           expandedPO.dateIssued = expandedPO.dateIssued ? new Date(expandedPO.dateIssued).toISOString().split('T')[0] : '';
           expandedPO.productPrice = data.productId.price;
+
+          expandedPO.issuedStatus = true;
+
+          expandedPO.transactions.forEach((trx) => {
+            if (this.transactionMap[trx._id] < 2) {
+              expandedPO.issuedStatus = false;
+            }
+          });
 
           this.desserts.splice(selectedIndex, 1, expandedPO);
         } catch (error) {
@@ -820,6 +854,7 @@ export default {
     async initialize() {
       try {
         this.$store.commit('SET_LOADING', true);
+        this.transactionMap = {};
         const promises = [];
         const getProducts = axios({
           method: 'GET',
@@ -847,22 +882,30 @@ export default {
           url: `${this.baseUrl}/customers/all/agents`,
         });
 
+        const getInvoiceBuyer = axios({
+          method: 'GET',
+          url: `${this.baseUrl}/invoices/all/buyer`,
+        });
+
         customerPromises.push(getCustomers);
         customerPromises.push(getAgents);
+        customerPromises.push(getInvoiceBuyer);
 
-        const customerz = await Promise.all(customerPromises);
+        const promiseBus = await Promise.all(customerPromises);
 
-        this.customerList = customerz[0].data;
+        this.customerList = promiseBus[0].data;
         this.customerNameList = [];
         this.customerList.forEach((cust) => {
           this.customerNameList.push(cust.name);
         });
 
-        this.agentList = customerz[1].data;
+        this.agentList = promiseBus[1].data;
         this.agentNameList = [];
         this.agentList.forEach((cust) => {
           this.agentNameList.push(cust.name);
         });
+
+        const invoiceBuyerList = promiseBus[2].data;
 
         promises.push(getOrders);
         let productIndex = -1;
@@ -922,6 +965,34 @@ export default {
             this.POSupplierNameList.push(`${POSupp.productId.name}::${POSupp.customerName}`);
           });
         }
+
+        invoiceBuyerList.forEach((invoice) => {
+          invoice.transactions.forEach((trx) => {
+            if (!this.transactionMap[trx]) {
+              this.transactionMap[trx] = 1;
+            } else {
+              this.transactionMap[trx] += 1;
+            }
+          });
+        });
+
+        this.POList.forEach((PO) => {
+          let issuedCount = 0;
+          PO.transactions.forEach((trx) => {
+            if (!this.transactionMap[trx]) {
+              this.transactionMap[trx] = 1;
+            } else {
+              this.transactionMap[trx] += 1;
+              issuedCount += 1;
+            }
+          });
+          if (issuedCount === PO.transactions.length) {
+            PO.issuedStatus = true;
+          } else {
+            PO.issuedStatus = false;
+          }
+        });
+        this.POList.sort((x, y) => x.issuedStatus - y.issuedStatus);
       } catch (error) {
         console.log(error);
       } finally {
@@ -1092,7 +1163,6 @@ export default {
     },
 
     clickEdit(PO) {
-      console.log(PO);
       this.feeProduct = [];
       this.feeAmount = [];
       this.feeAgent = [];
@@ -1112,6 +1182,7 @@ export default {
 
     async editPurchaseOrder() {
       try {
+        this.auth(2);
         this.$store.commit('SET_LOADING', true);
         const productIndex = this.productList.findIndex((product) => product.name === this.modifiedOrder.productInput);
         const { data } = await axios({

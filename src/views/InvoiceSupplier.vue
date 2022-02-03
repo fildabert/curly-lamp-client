@@ -5,11 +5,12 @@
   item-key="_id"
     single-expand
     show-expand
+    :items-per-page="30"
     @item-expanded="expandInvoice"
     :expanded.sync="expanded">
     <template v-slot:top>
       <v-toolbar flat color="white">
-        <v-toolbar-title>Invoice(Supplier)</v-toolbar-title>
+        <v-toolbar-title>Invoice (Payable)</v-toolbar-title>
         <v-divider class="mx-4" inset vertical></v-divider>
         <v-text-field
           v-model="search"
@@ -49,6 +50,7 @@
                               readonly
                               required
                               :rules="[v => !!v || 'Due Date is required']"
+                              :disabled="$store.state.user.admin < 3"
                               v-on="on"
                             ></v-text-field>
                           </template>
@@ -69,10 +71,10 @@
                       <v-text-field v-model="editedItem.invoiceInfos[index].product.name" label="Product" aria-required disabled></v-text-field>
                     </v-col>
                     <v-col cols="3" sm="3" md="3">
-                      <v-text-field v-model="editedItem.invoiceInfos[index].totalQuantity" label="Quantity" aria-required></v-text-field>
+                      <v-text-field v-model="editedItem.invoiceInfos[index].totalQuantity" label="Quantity" aria-required :disabled="$store.state.user.admin < 2"></v-text-field>
                     </v-col>
                     <v-col cols="3" sm="3" md="3">
-                     <v-text-field v-model="editedItem.invoiceInfos[index].price" label="Price" aria-required></v-text-field>
+                     <v-text-field v-model="editedItem.invoiceInfos[index].price" label="Price" aria-required :disabled="$store.state.user.admin < 3"></v-text-field>
                     </v-col>
                     <v-col cols="3" sm="3" md="3">
                      <v-text-field :value="editedItem.invoiceInfos[index].totalQuantity * editedItem.invoiceInfos[index].price" label="Total Amount" aria-required disabled></v-text-field>
@@ -106,7 +108,7 @@
     </template>
 
     <template v-slot:item.name="{ item, header, value }">
-      <v-chip small>{{ item.name }}</v-chip>
+      <v-chip small :color="item.duplicate ? 'pink lighten-2' : '' ">{{ item.name }}</v-chip>
     </template>
 
     <template v-slot:item.quantity="{ item, header, value }">
@@ -121,14 +123,48 @@
           <v-list-item-group>
             <v-list-item v-for="t in item.transactions.slice((page-1) * 30, ((page-1) + 1) * 30)" :key="t._id" selectable>
               <v-list-item-content>
-                <v-list-item-title @click="$router.push(`/delivery-order?id=${t._id}`)">
-                  D.O:
-                  <v-chip small>{{ t.invoice }}</v-chip> <v-chip small> {{ t.actualAmount || t.amount }} </v-chip> Tons delivered at
-                  <v-chip small v-if="t.dateDelivered">{{ new Date(t.dateDelivered).toISOString().split('T')[0] }}</v-chip>
-                  - status:
-                  <v-chip small :color="t.status === 'COMPLETED' ? 'green' : 'orange lighten-1'">
-                  {{ t.status }}
-                  </v-chip>
+                <v-list-item-title>
+                  <v-row dense no-gutters>
+                    <v-col cols="auto" class="mr-auto" @click="$router.push(`/delivery-order?id=${t._id}`)">
+                      D.O:
+                      <v-chip small>{{ t.invoice }}</v-chip> <span v-if="t.productId">[{{ t.productId.name }}]</span> <v-chip small> {{ t.actualAmount || t.amount }} </v-chip>
+                      <span v-if="t.productId">{{ t.productId.unit }}</span> delivered at
+                      <v-chip small v-if="t.dateDelivered">{{ new Date(t.dateDelivered).toISOString().split('T')[0] }}</v-chip>
+                      - status:
+                      <v-chip small :color="t.status === 'COMPLETED' ? 'green' : 'orange lighten-1'">
+                      {{ t.status }}
+                      </v-chip>
+
+                      <template v-if="item.type === 'SUPPLIER'">
+                        <v-tooltip v-if="transactionSupplierMap[t._id] ? transactionSupplierMap[t._id].length > 1 : false" bottom>
+                          <template v-slot:activator="{ on }">
+                            <v-icon small color="orange" v-on="on">fas fa-exclamation-triangle</v-icon>
+                          </template>
+                          <span>{{ transactionSupplierMap[t._id].length }} duplicates found in {{ JSON.stringify(transactionSupplierMap[t._id].map((trx) => trx.name)) }}</span>
+                        </v-tooltip>
+                      </template>
+
+                      <template v-if="item.type === 'AGENT'">
+                        <v-tooltip v-if="transactionAgentMap[t._id] ? transactionAgentMap[t._id].length > 1 : false" bottom>
+                          <template v-slot:activator="{ on }">
+                            <v-icon small color="orange" v-on="on">fas fa-exclamation-triangle</v-icon>
+                          </template>
+                          <span>{{ transactionAgentMap[t._id].length }} duplicates found in {{ JSON.stringify(transactionAgentMap[t._id].map((trx) => trx.name)) }}</span>
+                        </v-tooltip>
+                      </template>
+
+                    </v-col>
+
+                    <v-col cols="auto">
+                      <v-tooltip bottom>
+                        <template v-slot:activator="{ on }">
+                          <v-icon small class="mr-2" v-on="on" @click="takeOutDeliveryOrder(item, t)">fas fa-minus</v-icon>
+                        </template>
+                        <span>Remove</span>
+                      </v-tooltip>
+                    </v-col>
+                  </v-row>
+
                 </v-list-item-title>
               </v-list-item-content>
             </v-list-item>
@@ -173,17 +209,19 @@ import axios from 'axios';
 import { checkLogin } from '../helpers/authorization';
 
 export default {
+  name: 'InvoiceSupplier',
   data: () => ({
     baseUrl: '',
     search: '',
     dialog: false,
+    modalDate: false,
     headers: [
       { text: 'Supplier', value: 'customer.name' },
       { text: 'Invoice No', value: 'name' },
       { text: 'Date Range', value: 'dateRange' },
-      { text: 'Quantity(Tons)', value: 'quantity' },
-      { text: 'Total Amount', value: 'totalAmount' },
-      { text: 'Due Date', value: 'dueDate' },
+      { text: 'Quantity', value: 'quantity', width: '100' },
+      { text: 'Total Amount', value: 'totalAmount', width: '130' },
+      { text: 'Due Date', value: 'dueDate', width: '130' },
       { text: 'Amount Paid', value: 'amountPaid' },
       {
         text: 'Actions', value: 'action', sortable: false, align: 'right',
@@ -202,6 +240,8 @@ export default {
     action: '',
     modalDate: false,
     page: 1,
+    transactionSupplierMap: {},
+    transactionAgentMap: {},
   }),
 
   computed: {
@@ -228,11 +268,29 @@ export default {
   },
 
   created() {
+    document.title = this.$route.meta.title;
     this.baseUrl = this.$store.state.baseUrl;
+    if (this.$store.state.user.admin < 2) {
+      this.$router.push('/');
+    }
+
     this.initialize();
   },
 
   methods: {
+    auth(clearanceLvl) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const userData = checkLogin(token);
+        if (userData) {
+          if (userData.admin < clearanceLvl) {
+            throw { response: { data: { message: 'Unauthorized' } } };
+          }
+        } else {
+          this.$store.commit('SET_LOGIN', { isLogin: false, user: {} });
+        }
+      }
+    },
     async expandInvoice({ item, value }) {
       const selectedIndex = this.invoices.indexOf(item);
       if (value) {
@@ -241,6 +299,26 @@ export default {
           const { data } = await axios({
             method: 'GET',
             url: `${this.baseUrl}/invoices/${item._id}`,
+          });
+
+          const diffTime = new Date(data.dueDate) - new Date();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          data.alert = false;
+          if (diffDays <= 0) {
+            data.alert = true;
+          }
+
+          data.duplicate = false;
+          data.transactions.forEach((trx) => {
+            if (data.type === 'SUPPLIER') {
+              if (this.transactionSupplierMap[trx._id].length > 1) {
+                data.duplicate = true;
+              }
+            } else if (data.type === 'AGENT') {
+              if (this.transactionAgentMap[trx._id].length > 1) {
+                data.duplicate = true;
+              }
+            }
           });
 
           const expandedInvoice = data;
@@ -258,19 +336,6 @@ export default {
         }
       }
     },
-    auth() {
-      const token = localStorage.getItem('token');
-      if (token) {
-        const userData = checkLogin(token);
-        if (userData) {
-          if (!userData.admin) {
-            throw { response: { data: { message: 'Unauthorized' } } };
-          }
-        } else {
-          this.$store.commit('SET_LOGIN', { isLogin: false, user: {} });
-        }
-      }
-    },
     async initialize() {
       try {
         this.$store.commit('SET_LOADING', true);
@@ -279,15 +344,41 @@ export default {
           url: `${this.baseUrl}/invoices/all/supplier`,
         });
 
+        this.transactionSupplierMap = {};
+        this.transactionAgentMap = {};
+
         data.forEach((invoice) => {
           const diffTime = new Date(invoice.dueDate) - new Date();
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           invoice.alert = false;
-          if (diffDays <= 5) {
+          if (diffDays <= 0) {
             invoice.alert = true;
           }
           invoice.dueDate = new Date(invoice.dueDate).toISOString().split('T')[0];
           invoice.dateRange = `${new Date(invoice.startDate).toISOString().split('T')[0]} -> ${new Date(invoice.endDate).toISOString().split('T')[0]}`;
+
+          invoice.transactions.forEach((transaction) => {
+            if (invoice.type === 'SUPPLIER') {
+              if (!this.transactionSupplierMap[transaction]) {
+                this.transactionSupplierMap[transaction] = [invoice];
+              } else {
+                this.transactionSupplierMap[transaction].push(invoice);
+                this.transactionSupplierMap[transaction].forEach((inv) => {
+                  inv.duplicate = true;
+                });
+              }
+            } else if (invoice.type === 'AGENT') {
+              if (!this.transactionAgentMap[transaction]) {
+                this.transactionAgentMap[transaction] = [invoice];
+              } else {
+                this.transactionAgentMap[transaction].push(invoice);
+                this.transactionAgentMap[transaction].forEach((inv) => {
+                  // this is possible because address is same with 'invoice' parameter above
+                  inv.duplicate = true;
+                });
+              }
+            }
+          });
         });
 
         this.invoices = data;
@@ -355,6 +446,30 @@ export default {
         }
       }
     },
+
+    async takeOutDeliveryOrder(invoice, transaction) {
+      if (confirm('Do u really wanna do this?')) {
+        try {
+          // this.auth(2);
+          const { data } = await axios({
+            method: 'PATCH',
+            url: `${this.baseUrl}/invoices/takeOutDeliveryOrder`,
+            data: {
+              invoiceId: invoice._id,
+              transactionId: transaction._id,
+            },
+          });
+          await this.initialize();
+          this.expanded = [];
+        } catch (error) {
+          this.$store.commit('SET_ERROR', error.response.data.message);
+        } finally {
+          this.$store.commit('SET_LOADING', false);
+          this.close();
+        }
+      }
+    },
+
 
     close() {
       this.dialog = false;

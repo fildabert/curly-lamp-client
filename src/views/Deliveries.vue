@@ -1,7 +1,14 @@
 <template>
 <!-- eslint-disable linebreak-style -->
 <!-- eslint-disable max-len -->
-  <v-data-table :search="search" :headers="headers" :items="desserts" :loading="$store.state.loading"
+  <v-data-table :search="search"
+    :headers="headers"
+    :items="desserts"
+    :loading="$store.state.loading"
+    :items-per-page="30"
+    show-select
+    v-model="selected"
+    item-key="_id"
      class="elevation-1">
     <template v-slot:item.invoice="{ item }">
       <v-chip small :color="item.status === 'COMPLETED' ? 'green' : ''">{{ item.invoice }}</v-chip>
@@ -11,9 +18,30 @@
         <v-toolbar-title>Deliveries</v-toolbar-title>
         <v-divider class="mx-4" inset vertical></v-divider>
         <v-text-field
-          v-model="search"
+          v-model="DOFilter"
           prepend-icon="fas fa-search"
-          label="Search"
+          label="DO Number"
+          single-line
+          hide-details
+        ></v-text-field>
+        <v-text-field
+          v-model="PONoFilter"
+          prepend-icon="fas fa-search"
+          label="PO Number"
+          single-line
+          hide-details
+        ></v-text-field>
+        <v-text-field
+          v-model="productFilter"
+          prepend-icon="fas fa-search"
+          label="Product"
+          single-line
+          hide-details
+        ></v-text-field>
+        <v-text-field
+          v-model="customerFilter"
+          prepend-icon="fas fa-search"
+          label="Customer"
           single-line
           hide-details
         ></v-text-field>
@@ -30,7 +58,7 @@
               <v-container>
                 <v-row>
                   <v-col cols="12" sm="6" md="4">
-                    <v-text-field v-model="editedItem.invoice" label="Delivery Order"></v-text-field>
+                    <v-text-field v-model="editedItem.invoice" :disabled="selected.length > 1" label="Delivery Order"></v-text-field>
                   </v-col>
                   <v-col cols="12" sm="6" md="4">
                     <v-dialog
@@ -64,10 +92,10 @@
                   </v-col>
 
                   <v-col cols="12" sm="6" md="4">
-                    <v-text-field v-model="editedItem.carNo" label="Car No"></v-text-field>
+                    <v-text-field v-model="editedItem.carNo" :disabled="selected.length > 1" label="Car No"></v-text-field>
                   </v-col>
                   <v-col cols="12" sm="6" md="4">
-                    <v-text-field v-model="editedItem.actualAmount" label="Actual amount"></v-text-field>
+                    <v-text-field v-model="editedItem.actualAmount" :disabled="selected.length > 1" label="Actual amount"></v-text-field>
                   </v-col>
                   <v-col cols="12" sm="6" md="4">
                     <v-text-field v-model="editedItem.amount" disabled label="Amount"></v-text-field>
@@ -94,21 +122,21 @@
     <template v-slot:item.action="{ item }">
       <v-tooltip bottom v-if="item.type === 'BUYER'">
         <template v-slot:activator="{ on }">
-          <v-icon small class="mr-2" v-on="on" @click="editItem(item)">fas fa-edit</v-icon>
+          <v-icon small class="mr-2" v-on="on" @click="editItem(item)" :disabled="checkSelected">fas fa-edit</v-icon>
         </template>
           <span>Edit</span>
       </v-tooltip>
 
       <v-tooltip bottom v-if="item.type === 'BUYER'">
         <template v-slot:activator="{ on }">
-          <v-icon small class="mr-2" v-on="on" @click="details(item)">fas fa-ellipsis-h</v-icon>
+          <v-icon small class="mr-2" v-on="on" @click="details(item)" :disabled="selected.length > 1">fas fa-ellipsis-h</v-icon>
         </template>
           <span>Details</span>
       </v-tooltip>
 
       <v-tooltip bottom v-if="item.type === 'BUYER'">
         <template v-slot:activator="{ on }">
-          <v-icon small class="mr-2" v-on="on" @click="deleteItem(item)">fas fa-trash</v-icon>
+          <v-icon small class="mr-2" v-on="on" @click="deleteItem(item)" :disabled="selected.length > 1">fas fa-trash</v-icon>
         </template>
           <span>Delete</span>
       </v-tooltip>
@@ -139,22 +167,6 @@ export default {
     search: '',
     baseUrl: '',
     dialog: false,
-    headers: [
-      {
-        text: 'Delivery Order',
-        align: 'left',
-        sortable: false,
-        value: 'invoice',
-      },
-      { text: 'PO', value: 'orderId.PONo' },
-      { text: 'Product', value: 'productId.name' },
-      { text: 'Name', value: 'customerName' },
-      { text: 'Amount', value: 'amount' },
-      { text: 'Actual Amount', value: 'actualAmount' },
-      { text: 'Date Delivered', value: 'dateDelivered' },
-      { text: 'Type', value: 'type' },
-      { text: 'Actions', value: 'action', sortable: false },
-    ],
     desserts: [],
     editedIndex: -1,
     editedItem: {
@@ -165,9 +177,72 @@ export default {
       category: 0,
     },
     action: '',
+    DOFilter: '',
+    productFilter: '',
+    customerFilter: '',
+    selected: [],
+    PONoFilter: '',
   }),
 
   computed: {
+    checkSelected() {
+      const doMap = {};
+
+      this.selected.forEach((DO) => {
+        if (doMap[DO.customerName]) {
+          doMap[DO.customerName] += 1;
+        } else {
+          doMap[DO.customerName] = 1;
+        }
+      });
+      const selectedCustomerDOs = Object.keys(doMap).length;
+      if (selectedCustomerDOs > 1) {
+        return true;
+      }
+      return false;
+    },
+    headers() {
+      return [
+        {
+          text: 'Delivery Order',
+          align: 'left',
+          sortable: false,
+          value: 'invoice',
+          filter: (value) => {
+            if (!this.DOFilter) return true;
+            return value.toString().toLowerCase().includes(this.DOFilter.toLowerCase());
+          },
+        },
+        {
+          text: 'PO',
+          value: 'orderId.PONo',
+          filter: (value) => {
+            if (!this.PONoFilter) return true;
+            return value.toString().toLowerCase().includes(this.PONoFilter.toLowerCase());
+          },
+        },
+        {
+          text: 'Product',
+          value: 'productId.name',
+          filter: (value) => {
+            if (!this.productFilter) return true;
+            return value.toString().toLowerCase().includes(this.productFilter.toLowerCase());
+          },
+        },
+        {
+          text: 'Name',
+          value: 'customerName',
+          filter: (value) => {
+            if (!this.customerFilter) return true;
+            return value.toString().toLowerCase().includes(this.customerFilter.toLowerCase());
+          },
+        },
+        { text: 'Amount', value: 'amount', sortable: false },
+        { text: 'Actual Amount', value: 'actualAmount', sortable: false },
+        { text: 'Date Delivered', value: 'dateDelivered' },
+        { text: 'Actions', value: 'action', sortable: false },
+      ];
+    },
     formTitle() {
       return this.editedIndex === -1 ? 'New Item' : 'Edit Item';
     },
@@ -181,6 +256,7 @@ export default {
   },
 
   created() {
+    document.title = this.$route.meta.title;
     this.baseUrl = this.$store.state.baseUrl;
     this.initialize();
   },
@@ -189,12 +265,12 @@ export default {
     details(item) {
       this.$router.push(`/delivery-order?id=${item._id}`);
     },
-    auth() {
+    auth(clearanceLvl) {
       const token = localStorage.getItem('token');
       if (token) {
         const userData = checkLogin(token);
         if (userData) {
-          if (!userData.admin) {
+          if (userData.admin < clearanceLvl) {
             throw { response: { data: { message: 'Unauthorized' } } };
           }
         } else {
@@ -286,17 +362,30 @@ export default {
             },
           });
         } else if (this.action === 'EDIT') {
-          const { data } = await axios({
-            method: 'PUT',
-            url: `${this.baseUrl}/transactions/${this.editedItem._id}`,
-            data: {
-              ...this.editedItem,
-              amount: +this.editedItem.amount,
-              actualAmount: +this.editedItem.actualAmount,
-              orderId: this.editedItem.orderId._id,
-              productId: this.editedItem.productId._id,
-            },
-          });
+          if (this.selected.length > 1) {
+            const { data } = await axios({
+              method: 'PUT',
+              url: `${this.baseUrl}/transactions/updateMany`,
+              data: {
+                trxIds: this.selected.map((DO) => DO._id),
+                dateDelivered: this.editedItem.dateDelivered,
+                buyingPrice: this.editedItem.buyingPrice,
+                sellingPrice: this.editedItem.sellingPrice,
+              },
+            });
+          } else {
+            const { data } = await axios({
+              method: 'PUT',
+              url: `${this.baseUrl}/transactions/${this.editedItem._id}`,
+              data: {
+                ...this.editedItem,
+                amount: +this.editedItem.amount,
+                actualAmount: +this.editedItem.actualAmount,
+                orderId: this.editedItem.orderId._id,
+                productId: this.editedItem.productId._id,
+              },
+            });
+          }
         }
         this.initialize();
       } catch (error) {
