@@ -8,8 +8,8 @@ Vue.use(Vuex);
 export default new Vuex.Store({
   state: {
     isLogin: false,
-    baseUrl: 'https://wls-server.fildabert.com',
-    // baseUrl: 'http://localhost:3000',
+    // baseUrl: 'https://wls-server.fildabert.com',
+    baseUrl: 'http://localhost:3000',
     user: {},
     loading: false,
     hello: 'world',
